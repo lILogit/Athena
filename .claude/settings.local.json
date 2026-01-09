@@ -6,7 +6,8 @@
       "Bash(curl:*)",
       "Bash(node -e:*)",
       "Bash(sqlite3:*)",
-      "Bash(node test-clarify.js:*)"
+      "Bash(node test-clarify.js:*)",
+      "Bash(timeout 10 npm run dev:*)"
     ]
   }
 }
