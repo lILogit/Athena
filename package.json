@@ -1,0 +1,28 @@
+{
+  "name": "knowledge-graph-system",
+  "version": "1.0.0",
+  "description": "Human-in-the-Loop Knowledge Graph System",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm install --workspace=shared && npm install --workspace=backend && npm install --workspace=frontend",
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend",
+    "test": "npm test --workspace=backend && npm test --workspace=frontend",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test tests/e2e"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "playwright": "^1.40.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
