@@ -1,5 +1,5 @@
 import { db } from '../config/database';
-import { Session, Message, ClarificationState, ExtractedEntity, ExtractedRelationship } from '@kgs/shared';
+import { Session, Message, ClarificationState, ExtractedEntity, ExtractedRelationship, EnrichmentContext } from '@kgs/shared';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 import { claudeService } from './ClaudeService';
@@ -9,16 +9,23 @@ import { relationExtractor } from './nlp/RelationExtractor';
 export class ClarificationService {
   /**
    * Start a new clarification session
+   * @param enrichmentContext - If provided, session is in enrichment mode to add to existing graph
    */
-  async startSession(userId: number, initialInput: string): Promise<Session> {
+  async startSession(userId: number, initialInput: string, enrichmentContext?: EnrichmentContext): Promise<Session> {
     try {
       const timestamp = Math.floor(Date.now() / 1000);
+
+      // Build system context for enrichment mode
+      let enrichmentSystemPrompt = '';
+      if (enrichmentContext) {
+        enrichmentSystemPrompt = `\n\nCONTEXT: The user wants to add new information to an existing knowledge graph. Here are the existing entities and relationships:\n\nExisting entities: ${enrichmentContext.existing_nodes.join(', ')}\n\nExisting relationships:\n${enrichmentContext.existing_edges.map(e => `- ${e.source} --[${e.relation}]--> ${e.target}`).join('\n')}\n\nYour task is to help identify NEW entities and relationships that can be added to this graph. Focus on understanding how new concepts relate to the existing ones.`;
+      }
 
       // Get AI's first response
       const aiResponse = await claudeService.sendMessage([
         {
           role: 'user',
-          content: initialInput,
+          content: initialInput + enrichmentSystemPrompt,
           timestamp,
         },
       ]);

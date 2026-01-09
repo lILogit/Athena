@@ -8,7 +8,10 @@
       "Bash(sqlite3:*)",
       "Bash(node test-clarify.js:*)",
       "Bash(timeout 10 npm run dev:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

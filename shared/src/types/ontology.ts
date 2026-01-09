@@ -145,9 +145,20 @@ export interface UpdateProjectRequest {
   domain?: string;
 }
 
+export interface EnrichmentContext {
+  graph_id: number;
+  existing_nodes: string[];
+  existing_edges: Array<{
+    source: string | undefined;
+    target: string | undefined;
+    relation: string;
+  }>;
+}
+
 export interface StartClarificationRequest {
   initial_input: string;
   project_id: number;
+  enrichment_context?: EnrichmentContext;
 }
 
 export interface ClarificationMessageRequest {
@@ -158,6 +169,7 @@ export interface ClarificationMessageRequest {
 export interface FinalizeClarificationRequest {
   session_id: number;
   title?: string;
+  enrich_graph_id?: number; // If provided, merge into existing graph instead of creating new
 }
 
 export interface ConvertTextRequest {

@@ -7,14 +7,15 @@ import { api } from '../../services/api';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function ClarificationDialog() {
-  const { clarificationDialogOpen, closeClarificationDialog } = useUI();
-  const { loadGraphs } = useGraph();
+  const { clarificationDialogOpen, closeClarificationDialog, enrichmentMode } = useUI();
+  const { loadGraphs, currentGraph, addNode, addEdge } = useGraph();
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [extractedEntities, setExtractedEntities] = useState<ExtractedEntity[]>([]);
+  const [extractedRelationships, setExtractedRelationships] = useState<Array<{source: string; target: string; relation: string}>>([]);
   const [streamingMessage, setStreamingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -25,8 +26,19 @@ export default function ClarificationDialog() {
       setMessages([]);
       setInputValue('');
       setExtractedEntities([]);
+      setExtractedRelationships([]);
+
+      // In enrichment mode, pre-populate with existing entities
+      if (enrichmentMode && currentGraph) {
+        const existingEntities: ExtractedEntity[] = currentGraph.ontology_data.nodes.map(node => ({
+          label: node.label,
+          type: node.type,
+          confidence: node.confidence,
+        }));
+        setExtractedEntities(existingEntities);
+      }
     }
-  }, [clarificationDialogOpen]);
+  }, [clarificationDialogOpen, enrichmentMode, currentGraph]);
 
   useEffect(() => {
     // Auto-scroll to bottom
@@ -38,9 +50,21 @@ export default function ClarificationDialog() {
 
     setIsLoading(true);
     try {
+      // Build context for enrichment mode
+      const existingContext = enrichmentMode && currentGraph ? {
+        graph_id: currentGraph.id,
+        existing_nodes: currentGraph.ontology_data.nodes.map(n => n.label),
+        existing_edges: currentGraph.ontology_data.edges.map(e => ({
+          source: currentGraph.ontology_data.nodes.find(n => n.id === e.source)?.label,
+          target: currentGraph.ontology_data.nodes.find(n => n.id === e.target)?.label,
+          relation: e.relation,
+        })),
+      } : undefined;
+
       const result = await api.startClarification({
         initial_input: inputValue,
         project_id: 1, // TODO: Get from context
+        enrichment_context: existingContext,
       });
 
       setSessionId(result.session_id);
@@ -56,7 +80,15 @@ export default function ClarificationDialog() {
           timestamp: Date.now(),
         },
       ]);
-      setExtractedEntities(result.extracted_entities);
+
+      // In enrichment mode, merge new entities with existing
+      if (enrichmentMode && currentGraph) {
+        const existingLabels = new Set(currentGraph.ontology_data.nodes.map(n => n.label));
+        const newEntities = result.extracted_entities.filter(e => !existingLabels.has(e.label));
+        setExtractedEntities(prev => [...prev, ...newEntities]);
+      } else {
+        setExtractedEntities(result.extracted_entities);
+      }
       setInputValue('');
     } catch (error) {
       console.error('Failed to start session:', error);
@@ -118,7 +150,19 @@ export default function ClarificationDialog() {
                 fullResponse += data.content;
                 setStreamingMessage(fullResponse);
               } else if (data.type === 'entities') {
-                setExtractedEntities(data.entities);
+                // In enrichment mode, merge new entities with existing
+                if (enrichmentMode && currentGraph) {
+                  const existingLabels = new Set(currentGraph.ontology_data.nodes.map(n => n.label));
+                  const newEntities = data.entities.filter((e: ExtractedEntity) => !existingLabels.has(e.label));
+                  setExtractedEntities(prev => {
+                    const prevLabels = new Set(prev.map(p => p.label));
+                    return [...prev, ...newEntities.filter((e: ExtractedEntity) => !prevLabels.has(e.label))];
+                  });
+                } else {
+                  setExtractedEntities(data.entities);
+                }
+              } else if (data.type === 'relationships') {
+                setExtractedRelationships(data.relationships);
               } else if (data.type === 'done') {
                 // Add final message
                 setMessages((prev) => [
@@ -149,20 +193,55 @@ export default function ClarificationDialog() {
 
     setIsLoading(true);
     try {
-      const { graph } = await api.finalizeClarification({
-        session_id: sessionId,
-        title: `Graph - ${new Date().toLocaleDateString()}`,
-      });
+      if (enrichmentMode && currentGraph) {
+        // In enrichment mode, add new entities and relationships to existing graph
+        const result = await api.finalizeClarification({
+          session_id: sessionId,
+          title: currentGraph.title,
+          enrich_graph_id: currentGraph.id,
+        });
 
-      // Reload graphs and close dialog
-      await loadGraphs();
-      closeClarificationDialog();
+        if (result.ontology) {
+          // Add new nodes to the graph
+          const existingNodeLabels = new Set(currentGraph.ontology_data.nodes.map(n => n.label));
+          for (const node of result.ontology.nodes) {
+            if (!existingNodeLabels.has(node.label)) {
+              addNode(node);
+            }
+          }
 
-      // Navigate to new graph
-      window.location.href = `/graph/${graph.id}`;
+          // Add new edges to the graph
+          const existingEdgeKeys = new Set(
+            currentGraph.ontology_data.edges.map(e => `${e.source}-${e.relation}-${e.target}`)
+          );
+          for (const edge of result.ontology.edges) {
+            const edgeKey = `${edge.source}-${edge.relation}-${edge.target}`;
+            if (!existingEdgeKeys.has(edgeKey)) {
+              addEdge(edge);
+            }
+          }
+        }
+
+        closeClarificationDialog();
+      } else {
+        // Create new graph
+        const result = await api.finalizeClarification({
+          session_id: sessionId,
+          title: `Graph - ${new Date().toLocaleDateString()}`,
+        });
+
+        // Reload graphs and close dialog
+        await loadGraphs();
+        closeClarificationDialog();
+
+        // Navigate to new graph
+        if (result.graph) {
+          window.location.href = `/graph/${result.graph.id}`;
+        }
+      }
     } catch (error) {
       console.error('Failed to finalize:', error);
-      alert('Failed to create graph');
+      alert(enrichmentMode ? 'Failed to enrich graph' : 'Failed to create graph');
     } finally {
       setIsLoading(false);
     }
@@ -176,9 +255,13 @@ export default function ClarificationDialog() {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Create Knowledge Graph</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {enrichmentMode ? 'Enrich Knowledge Graph' : 'Create Knowledge Graph'}
+            </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Describe your idea and I'll help extract a structured ontology
+              {enrichmentMode
+                ? `Add new concepts to "${currentGraph?.title}". I'll extract entities and relationships from your input.`
+                : "Describe your idea and I'll help extract a structured ontology"}
             </p>
           </div>
           <button
@@ -197,13 +280,14 @@ export default function ClarificationDialog() {
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">💭</div>
+                <div className="text-6xl mb-4">{enrichmentMode ? '➕' : '💭'}</div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  What's on your mind?
+                  {enrichmentMode ? 'What would you like to add?' : "What's on your mind?"}
                 </h3>
                 <p className="text-gray-600 max-w-md mx-auto">
-                  Share your idea, concept, or question. I'll ask clarifying questions to help build a
-                  structured knowledge graph.
+                  {enrichmentMode
+                    ? `Describe new concepts, relationships, or context to add to your graph. I'll identify new entities and how they relate to existing ones.`
+                    : `Share your idea, concept, or question. I'll ask clarifying questions to help build a structured knowledge graph.`}
                 </p>
               </div>
             ) : (
@@ -229,21 +313,57 @@ export default function ClarificationDialog() {
           {/* Entity Preview Sidebar */}
           {extractedEntities.length > 0 && (
             <div className="w-64 border-l border-gray-200 p-4 overflow-y-auto bg-gray-50">
-              <h3 className="font-semibold text-gray-900 mb-3">Extracted Entities</h3>
+              <h3 className="font-semibold text-gray-900 mb-3">
+                {enrichmentMode ? 'Entities' : 'Extracted Entities'}
+              </h3>
               <div className="space-y-2">
-                {extractedEntities.map((entity, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white p-2 rounded-lg border border-gray-200 text-sm"
-                  >
-                    <div className="font-medium text-gray-900">{entity.label}</div>
-                    <div className="text-xs text-gray-600 mt-1 flex items-center justify-between">
-                      <span className="capitalize">{entity.type}</span>
-                      <span>{(entity.confidence * 100).toFixed(0)}%</span>
+                {extractedEntities.map((entity, idx) => {
+                  const isExisting = enrichmentMode && currentGraph?.ontology_data.nodes.some(n => n.label === entity.label);
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-2 rounded-lg border text-sm ${
+                        isExisting
+                          ? 'bg-gray-100 border-gray-300'
+                          : 'bg-white border-green-300 ring-1 ring-green-200'
+                      }`}
+                    >
+                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                        {entity.label}
+                        {isExisting ? (
+                          <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">existing</span>
+                        ) : enrichmentMode ? (
+                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">new</span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1 flex items-center justify-between">
+                        <span className="capitalize">{entity.type}</span>
+                        <span>{(entity.confidence * 100).toFixed(0)}%</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* Show extracted relationships in enrichment mode */}
+              {enrichmentMode && extractedRelationships.length > 0 && (
+                <>
+                  <h3 className="font-semibold text-gray-900 mb-3 mt-6">New Relationships</h3>
+                  <div className="space-y-2">
+                    {extractedRelationships.map((rel, idx) => (
+                      <div key={idx} className="bg-white p-2 rounded-lg border border-blue-200 text-sm">
+                        <div className="text-xs text-gray-700">
+                          <span className="font-medium">{rel.source}</span>
+                          <span className="mx-1 text-blue-500">→</span>
+                          <span className="text-blue-600">{rel.relation}</span>
+                          <span className="mx-1 text-blue-500">→</span>
+                          <span className="font-medium">{rel.target}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -268,7 +388,9 @@ export default function ClarificationDialog() {
               placeholder={
                 sessionId
                   ? 'Type your response...'
-                  : 'Describe your idea (e.g., "Consciousness is not material")'
+                  : enrichmentMode
+                    ? 'Describe what to add (e.g., "Add the concept of neural networks and how they relate to learning")'
+                    : 'Describe your idea (e.g., "Consciousness is not material")'
               }
               disabled={isLoading || isStreaming}
               className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
@@ -295,7 +417,7 @@ export default function ClarificationDialog() {
                   disabled={isLoading || extractedEntities.length === 0}
                   className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Finalize
+                  {enrichmentMode ? 'Add to Graph' : 'Finalize'}
                 </button>
               </>
             )}

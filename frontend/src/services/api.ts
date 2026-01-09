@@ -3,6 +3,7 @@ import {
   Graph,
   Project,
   Session,
+  OntologyData,
   CreateGraphRequest,
   UpdateGraphRequest,
   CreateProjectRequest,
@@ -112,8 +113,8 @@ class ApiService {
     });
   }
 
-  async finalizeClarification(data: FinalizeClarificationRequest): Promise<{ graph: Graph }> {
-    return this.request<{ graph: Graph }>('/api/clarify/finalize', {
+  async finalizeClarification(data: FinalizeClarificationRequest): Promise<{ graph?: Graph; ontology?: OntologyData }> {
+    return this.request<{ graph?: Graph; ontology?: OntologyData }>('/api/clarify/finalize', {
       method: 'POST',
       body: JSON.stringify(data),
     });

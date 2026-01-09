@@ -8,11 +8,16 @@ interface UIState {
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
 
+  // Enrichment mode - adds entities to existing graph
+  enrichmentMode: boolean;
+  enrichGraphId: number | null;
+
   // Actions
   toggleSidebar: () => void;
   toggleContextPanel: () => void;
   toggleClarificationDialog: () => void;
   openClarificationDialog: () => void;
+  openEnrichmentDialog: (graphId: number) => void;
   closeClarificationDialog: () => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
@@ -25,13 +30,16 @@ const useUIStore = create<UIState>((set) => ({
   clarificationDialogOpen: false,
   selectedNodeId: null,
   selectedEdgeId: null,
+  enrichmentMode: false,
+  enrichGraphId: null,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   toggleContextPanel: () => set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
   toggleClarificationDialog: () =>
     set((state) => ({ clarificationDialogOpen: !state.clarificationDialogOpen })),
-  openClarificationDialog: () => set({ clarificationDialogOpen: true }),
-  closeClarificationDialog: () => set({ clarificationDialogOpen: false }),
+  openClarificationDialog: () => set({ clarificationDialogOpen: true, enrichmentMode: false, enrichGraphId: null }),
+  openEnrichmentDialog: (graphId: number) => set({ clarificationDialogOpen: true, enrichmentMode: true, enrichGraphId: graphId }),
+  closeClarificationDialog: () => set({ clarificationDialogOpen: false, enrichmentMode: false, enrichGraphId: null }),
   selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedEdgeId: null }),
   selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null }),
   clearSelection: () => set({ selectedNodeId: null, selectedEdgeId: null }),

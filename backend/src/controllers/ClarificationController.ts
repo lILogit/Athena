@@ -22,14 +22,14 @@ export class ClarificationController {
    */
   async start(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { initial_input, project_id } = req.body as StartClarificationRequest;
+      const { initial_input, project_id, enrichment_context } = req.body as StartClarificationRequest;
 
       if (!initial_input || !project_id) {
         throw new AppError(400, 'INVALID_INPUT', 'initial_input and project_id are required');
       }
 
       const userId = req.user!.id;
-      const session = await clarificationService.startSession(userId, initial_input);
+      const session = await clarificationService.startSession(userId, initial_input, enrichment_context);
 
       const response: ApiResponse = {
         data: {
@@ -143,12 +143,12 @@ export class ClarificationController {
   }
 
   /**
-   * Finalize clarification and create graph
+   * Finalize clarification and create graph or return ontology for enrichment
    * POST /api/clarify/finalize
    */
   async finalize(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { session_id, title } = req.body as FinalizeClarificationRequest;
+      const { session_id, title, enrich_graph_id } = req.body as FinalizeClarificationRequest;
 
       if (!session_id) {
         throw new AppError(400, 'INVALID_INPUT', 'session_id is required');
@@ -174,10 +174,22 @@ export class ClarificationController {
         });
       }
 
-      // Get project_id from the first user message or use default
+      // If enriching an existing graph, return just the ontology
+      if (enrich_graph_id) {
+        // Link session to the existing graph
+        clarificationService.linkSessionToGraph(session_id, userId, enrich_graph_id);
+
+        const response: ApiResponse = {
+          data: { ontology: ontologyData },
+        };
+
+        res.json(response);
+        return;
+      }
+
+      // Otherwise, create a new graph
       const projectId = 1; // TODO: Get from session context
 
-      // Create graph
       const graph = graphService.createGraph(userId, {
         project_id: projectId,
         title: title || `Graph from ${new Date().toLocaleDateString()}`,
