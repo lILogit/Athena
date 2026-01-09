@@ -3,11 +3,19 @@ import { create } from 'zustand';
 import { Graph, OntologyData, OntologyNode, OntologyEdge } from '@kgs/shared';
 import { api } from '../services/api';
 
+const MAX_HISTORY_SIZE = 50;
+
 interface GraphState {
   currentGraph: Graph | null;
   graphs: Graph[];
   loading: boolean;
   error: string | null;
+
+  // History for undo/redo
+  history: OntologyData[];
+  historyIndex: number;
+  canUndo: boolean;
+  canRedo: boolean;
 
   // Actions
   setCurrentGraph: (graph: Graph | null) => void;
@@ -15,12 +23,23 @@ interface GraphState {
   loadGraphs: (projectId?: number) => Promise<void>;
   createGraph: (projectId: number, title: string, description?: string) => Promise<Graph>;
   updateGraph: (id: number, ontologyData: OntologyData) => Promise<void>;
+  updateGraphDescription: (description: string) => void;
   updateNode: (nodeId: string, updates: Partial<OntologyNode>) => void;
   updateEdge: (edgeId: string, updates: Partial<OntologyEdge>) => void;
   addNode: (node: OntologyNode) => void;
   addEdge: (edge: OntologyEdge) => void;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
+
+  // Undo/Redo actions
+  undo: () => void;
+  redo: () => void;
+  clearHistory: () => void;
+}
+
+// Helper to deep clone ontology data
+function cloneOntologyData(data: OntologyData): OntologyData {
+  return JSON.parse(JSON.stringify(data));
 }
 
 const useGraphStore = create<GraphState>((set, get) => ({
@@ -29,13 +48,35 @@ const useGraphStore = create<GraphState>((set, get) => ({
   loading: false,
   error: null,
 
-  setCurrentGraph: (graph) => set({ currentGraph: graph }),
+  // History state
+  history: [],
+  historyIndex: -1,
+  canUndo: false,
+  canRedo: false,
+
+  setCurrentGraph: (graph) => {
+    // Reset history when loading a new graph
+    set({
+      currentGraph: graph,
+      history: graph ? [cloneOntologyData(graph.ontology_data)] : [],
+      historyIndex: 0,
+      canUndo: false,
+      canRedo: false,
+    });
+  },
 
   loadGraph: async (id) => {
     set({ loading: true, error: null });
     try {
       const { graph } = await api.getGraph(id);
-      set({ currentGraph: graph, loading: false });
+      set({
+        currentGraph: graph,
+        loading: false,
+        history: [cloneOntologyData(graph.ontology_data)],
+        historyIndex: 0,
+        canUndo: false,
+        canRedo: false,
+      });
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
@@ -64,6 +105,10 @@ const useGraphStore = create<GraphState>((set, get) => ({
         graphs: [graph, ...state.graphs],
         currentGraph: graph,
         loading: false,
+        history: [cloneOntologyData(graph.ontology_data)],
+        historyIndex: 0,
+        canUndo: false,
+        canRedo: false,
       }));
       return graph;
     } catch (error: any) {
@@ -85,6 +130,49 @@ const useGraphStore = create<GraphState>((set, get) => ({
     }
   },
 
+  updateGraphDescription: (description) => {
+    const { currentGraph } = get();
+    if (!currentGraph) return;
+
+    // Update local state immediately
+    set({
+      currentGraph: {
+        ...currentGraph,
+        description,
+      },
+    });
+
+    // Save to server (debounced in component)
+    api.updateGraph(currentGraph.id, { description }).catch((error: any) => {
+      set({ error: error.message });
+    });
+  },
+
+  // Helper to push current state to history before making changes
+  _pushToHistory: (newOntologyData: OntologyData) => {
+    const { history, historyIndex } = get();
+
+    // Remove any future history if we're not at the end
+    const newHistory = history.slice(0, historyIndex + 1);
+
+    // Add the new state
+    newHistory.push(cloneOntologyData(newOntologyData));
+
+    // Limit history size
+    if (newHistory.length > MAX_HISTORY_SIZE) {
+      newHistory.shift();
+    }
+
+    const newIndex = newHistory.length - 1;
+
+    set({
+      history: newHistory,
+      historyIndex: newIndex,
+      canUndo: newIndex > 0,
+      canRedo: false,
+    });
+  },
+
   updateNode: (nodeId, updates) => {
     const { currentGraph } = get();
     if (!currentGraph) return;
@@ -97,6 +185,9 @@ const useGraphStore = create<GraphState>((set, get) => ({
       ...currentGraph.ontology_data,
       nodes: updatedNodes,
     };
+
+    // Push to history
+    (get() as any)._pushToHistory(newOntologyData);
 
     set({
       currentGraph: {
@@ -119,6 +210,9 @@ const useGraphStore = create<GraphState>((set, get) => ({
       edges: updatedEdges,
     };
 
+    // Push to history
+    (get() as any)._pushToHistory(newOntologyData);
+
     set({
       currentGraph: {
         ...currentGraph,
@@ -136,6 +230,9 @@ const useGraphStore = create<GraphState>((set, get) => ({
       nodes: [...currentGraph.ontology_data.nodes, node],
     };
 
+    // Push to history
+    (get() as any)._pushToHistory(newOntologyData);
+
     set({
       currentGraph: {
         ...currentGraph,
@@ -152,6 +249,9 @@ const useGraphStore = create<GraphState>((set, get) => ({
       ...currentGraph.ontology_data,
       edges: [...currentGraph.ontology_data.edges, edge],
     };
+
+    // Push to history
+    (get() as any)._pushToHistory(newOntologyData);
 
     set({
       currentGraph: {
@@ -172,6 +272,9 @@ const useGraphStore = create<GraphState>((set, get) => ({
       ),
     };
 
+    // Push to history
+    (get() as any)._pushToHistory(newOntologyData);
+
     set({
       currentGraph: {
         ...currentGraph,
@@ -189,11 +292,60 @@ const useGraphStore = create<GraphState>((set, get) => ({
       edges: currentGraph.ontology_data.edges.filter((edge) => edge.id !== edgeId),
     };
 
+    // Push to history
+    (get() as any)._pushToHistory(newOntologyData);
+
     set({
       currentGraph: {
         ...currentGraph,
         ontology_data: newOntologyData,
       },
+    });
+  },
+
+  undo: () => {
+    const { currentGraph, history, historyIndex } = get();
+    if (!currentGraph || historyIndex <= 0) return;
+
+    const newIndex = historyIndex - 1;
+    const previousState = cloneOntologyData(history[newIndex]);
+
+    set({
+      currentGraph: {
+        ...currentGraph,
+        ontology_data: previousState,
+      },
+      historyIndex: newIndex,
+      canUndo: newIndex > 0,
+      canRedo: true,
+    });
+  },
+
+  redo: () => {
+    const { currentGraph, history, historyIndex } = get();
+    if (!currentGraph || historyIndex >= history.length - 1) return;
+
+    const newIndex = historyIndex + 1;
+    const nextState = cloneOntologyData(history[newIndex]);
+
+    set({
+      currentGraph: {
+        ...currentGraph,
+        ontology_data: nextState,
+      },
+      historyIndex: newIndex,
+      canUndo: true,
+      canRedo: newIndex < history.length - 1,
+    });
+  },
+
+  clearHistory: () => {
+    const { currentGraph } = get();
+    set({
+      history: currentGraph ? [cloneOntologyData(currentGraph.ontology_data)] : [],
+      historyIndex: 0,
+      canUndo: false,
+      canRedo: false,
     });
   },
 }));

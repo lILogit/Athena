@@ -23,8 +23,11 @@ function CustomEdge({
     targetPosition,
   });
 
-  const edgeColor = getEdgeColor(data?.relation || 'influences');
-  const strokeWidth = 1 + (data?.strength || 0.5) * 2; // 1-3px based on strength
+  // Safe defaults if data is undefined
+  const relation = data?.relation || 'influences';
+  const strength = data?.strength ?? 0.5;
+  const edgeColor = getEdgeColor(relation);
+  const strokeWidth = 1 + strength * 2; // 1-3px based on strength
 
   return (
     <>
@@ -34,9 +37,9 @@ function CustomEdge({
         d={edgePath}
         stroke={edgeColor}
         strokeWidth={strokeWidth}
-        strokeDasharray={(data?.strength || 0.5) < 0.5 ? '5,5' : undefined}
+        strokeDasharray={strength < 0.5 ? '5,5' : undefined}
         fill="none"
-        markerEnd="url(#arrow)"
+        markerEnd={`url(#arrow-${id})`}
         style={{
           opacity: selected ? 1 : 0.6,
         }}
@@ -48,16 +51,16 @@ function CustomEdge({
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
           }}
-          className="text-xs bg-white px-2 py-1 rounded border border-gray-300 shadow-sm font-medium"
+          className="text-xs bg-white px-2 py-1 rounded border border-gray-300 shadow-sm font-medium nodrag nopan"
         >
-          {data?.relation || 'influences'}
+          {relation}
         </div>
       </EdgeLabelRenderer>
 
-      {/* Arrow marker definition */}
+      {/* Arrow marker definition - unique per edge to avoid conflicts */}
       <defs>
         <marker
-          id="arrow"
+          id={`arrow-${id}`}
           markerWidth="10"
           markerHeight="10"
           refX="9"
