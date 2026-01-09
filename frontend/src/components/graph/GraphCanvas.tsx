@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -50,32 +50,45 @@ export default function GraphCanvas() {
   const [newEdgeRelation, setNewEdgeRelation] = useState<RelationType>('influences');
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
 
+  // Track the last loaded graph ID to prevent unnecessary resets
+  const lastLoadedGraphId = useRef<number | null>(null);
+
   // Convert ontology data to React Flow format (without auto-layout)
+  // Only reset positions when graph ID changes or node count changes
   useEffect(() => {
     if (currentGraph) {
-      const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
-      const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
+      const isNewGraph = lastLoadedGraphId.current !== currentGraph.id;
+      const nodeCountChanged = nodes.length !== currentGraph.ontology_data.nodes.length;
+      const edgeCountChanged = edges.length !== currentGraph.ontology_data.edges.length;
 
-      // Preserve existing positions if nodes already exist
-      const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
+      // Only do a full reset if this is a new graph or node/edge count changed
+      if (isNewGraph || nodeCountChanged || edgeCountChanged) {
+        const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
+        const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
 
-      const nodesWithPositions = flowNodes.map((node, index) => {
-        const existingPos = existingPositions.get(node.id);
-        if (existingPos && existingPos.x !== 0 && existingPos.y !== 0) {
-          return { ...node, position: existingPos };
-        }
-        // Default grid position for new nodes
-        return {
-          ...node,
-          position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
-        };
-      });
+        // Preserve existing positions if nodes already exist
+        const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
 
-      setNodes(nodesWithPositions);
-      setEdges(flowEdges);
+        const nodesWithPositions = flowNodes.map((node, index) => {
+          const existingPos = existingPositions.get(node.id);
+          if (existingPos && existingPos.x !== 0 && existingPos.y !== 0) {
+            return { ...node, position: existingPos };
+          }
+          // Default grid position for new nodes
+          return {
+            ...node,
+            position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
+          };
+        });
+
+        setNodes(nodesWithPositions);
+        setEdges(flowEdges);
+        lastLoadedGraphId.current = currentGraph.id;
+      }
     } else {
       setNodes([]);
       setEdges([]);
+      lastLoadedGraphId.current = null;
     }
   }, [currentGraph]);
 

@@ -30,6 +30,7 @@ interface GraphState {
   addEdge: (edge: OntologyEdge) => void;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
+  deleteGraph: (graphId: number) => Promise<void>;
 
   // Undo/Redo actions
   undo: () => void;
@@ -301,6 +302,32 @@ const useGraphStore = create<GraphState>((set, get) => ({
         ontology_data: newOntologyData,
       },
     });
+  },
+
+  deleteGraph: async (graphId) => {
+    const { currentGraph, graphs } = get();
+
+    try {
+      await api.deleteGraph(graphId);
+
+      // Remove from graphs list
+      const updatedGraphs = graphs.filter((g) => g.id !== graphId);
+
+      // Clear current graph if it was the deleted one
+      const newCurrentGraph = currentGraph?.id === graphId ? null : currentGraph;
+
+      set({
+        graphs: updatedGraphs,
+        currentGraph: newCurrentGraph,
+        history: newCurrentGraph ? [cloneOntologyData(newCurrentGraph.ontology_data)] : [],
+        historyIndex: 0,
+        canUndo: false,
+        canRedo: false,
+      });
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   undo: () => {

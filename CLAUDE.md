@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **Human-in-the-Loop Knowledge Graph System** - an interactive conversational AI system that transforms human thoughts into structured knowledge graphs through iterative dialogue, visual editing, and pattern recognition.
 
-**Current Status**: Pre-implementation. The `Claude.md` file contains the complete app specification with detailed requirements for all features. This CLAUDE.md provides architectural guidance for implementation.
+**Current Status**: Phase 1 complete, Phase 2 in progress. Core features implemented: Express API, SQLite persistence, Claude API streaming, React Flow canvas with CRUD operations, clarification dialog, undo/redo, multiple layout algorithms.
 
 **Core Concept**: Users input ideas in natural language → AI clarifies through conversation → System extracts ontology → Visual graph editor → Compare against knowledge bases → Discover patterns → Store and reuse.
 
@@ -16,18 +16,17 @@ This is a **Human-in-the-Loop Knowledge Graph System** - an interactive conversa
 - **React + Vite** - Modern React framework with fast HMR
 - **Tailwind CSS** (CDN) - Utility-first styling
 - **React Flow** - Interactive graph visualization and editing
+- **Zustand** - State management for graphs and UI
 - **React Router** - Client-side routing
-- **Socket.io-client** - Real-time WebSocket communication
 - **React Markdown** - Markdown rendering
 
 ### Backend
 - **Node.js + Express** - REST API server
 - **SQLite + better-sqlite3** - Metadata, users, sessions
-- **Neo4j** - Graph database for ontology storage
-- **Qdrant/Pinecone** - Vector database for semantic search
-- **Anthropic Claude API** - Conversational AI and NLP
-- **n8n MCP Server** - Workflow orchestration
-- **Socket.io** - Real-time bidirectional communication
+- **Anthropic Claude API** - Conversational AI with SSE streaming
+- **Neo4j** (Phase 3) - Graph database for ontology storage
+- **Qdrant/Pinecone** (Phase 3) - Vector database for semantic search
+- **n8n MCP Server** (Phase 4+) - Workflow orchestration
 
 ## Project Architecture
 
@@ -217,11 +216,9 @@ Causal chains are a core differentiator. Users describe processes/arguments, sys
 
 ## Implementation Phases
 
-Refer to "Implementation Priority" section in `Claude.md` spec for detailed phase breakdown. Key priorities:
-
-**Phase 1 (Critical)**: Express + SQLite + Claude API + React Flow canvas + Clarification dialog
-**Phase 2 (High)**: Entity extraction + Interactive editing + Save/load
-**Phase 3 (High)**: Neo4j + Vector DB + Comparison engine
+**Phase 1 (Complete)**: Express + SQLite + Claude API + React Flow canvas + Clarification dialog
+**Phase 2 (In Progress)**: Interactive editing (CRUD, undo/redo, layout algorithms) + Save/load + Graph notes
+**Phase 3 (Planned)**: Neo4j + Vector DB + Comparison engine
 **Phases 4-8**: Patterns, causal analysis, n8n, advanced features, polish
 
 ## Code Organization (When Implementing)
@@ -300,8 +297,7 @@ This serves as the gold standard integration test:
 
 ## Notes
 
-- This is a greenfield project - no existing codebase yet
 - The `Claude.md` file is the app specification, not implementation guidance
-- When implementing, prioritize user experience and smooth real-time interactions
+- Prioritize user experience and smooth real-time interactions
 - Graph visualization is the core UX element - make it beautiful and responsive
 - AI clarification quality determines ontology quality - invest time here

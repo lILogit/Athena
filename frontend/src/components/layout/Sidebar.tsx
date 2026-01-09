@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
-import { Project } from '@kgs/shared';
+import { Project, Graph } from '@kgs/shared';
 import { api } from '../../services/api';
 
 export default function Sidebar() {
   const navigate = useNavigate();
-  const { graphs, currentGraph, loadGraphs } = useGraph();
+  const { graphs, currentGraph, loadGraphs, deleteGraph } = useGraph();
   const { openClarificationDialog } = useUI();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number>(1);
+  const [graphToDelete, setGraphToDelete] = useState<Graph | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -34,6 +35,20 @@ export default function Sidebar() {
 
   function handleGraphClick(graphId: number) {
     navigate(`/graph/${graphId}`);
+  }
+
+  async function handleDeleteGraph() {
+    if (!graphToDelete) return;
+    try {
+      await deleteGraph(graphToDelete.id);
+      setGraphToDelete(null);
+      // If deleted graph was current, navigate to home
+      if (currentGraph?.id === graphToDelete.id) {
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Failed to delete graph:', error);
+    }
   }
 
   return (
@@ -78,24 +93,40 @@ export default function Sidebar() {
           </div>
         ) : (
           <div className="space-y-2">
-            {graphs.map((graph: any) => (
-              <button
+            {graphs.map((graph: Graph) => (
+              <div
                 key={graph.id}
-                onClick={() => handleGraphClick(graph.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                className={`w-full text-left p-3 rounded-lg border transition-colors group relative ${
                   currentGraph?.id === graph.id
                     ? 'bg-primary/10 border-primary'
                     : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <div className="font-medium text-gray-900 mb-1">{graph.title}</div>
-                {graph.description && (
-                  <div className="text-sm text-gray-600 line-clamp-2">{graph.description}</div>
-                )}
-                <div className="text-xs text-gray-500 mt-2">
-                  {graph.ontology_data.nodes.length} nodes • {graph.ontology_data.edges.length} edges
-                </div>
-              </button>
+                <button
+                  onClick={() => handleGraphClick(graph.id)}
+                  className="w-full text-left"
+                >
+                  <div className="font-medium text-gray-900 mb-1 pr-6">{graph.title}</div>
+                  {graph.description && (
+                    <div className="text-sm text-gray-600 line-clamp-2">{graph.description}</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-2">
+                    {graph.ontology_data.nodes.length} nodes • {graph.ontology_data.edges.length} edges
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGraphToDelete(graph);
+                  }}
+                  className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete graph"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -113,6 +144,32 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {graphToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96 mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Graph</h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete "{graphToDelete.title}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setGraphToDelete(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteGraph}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
