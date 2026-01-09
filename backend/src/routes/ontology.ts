@@ -13,4 +13,7 @@ router.post('/convert', (req, res, next) => ontologyController.convert(req, res,
 // POST /api/ontology/extract - Extract entities and relationships
 router.post('/extract', (req, res, next) => ontologyController.extract(req, res, next));
 
+// POST /api/ontology/causal-chains - Analyze causal chains
+router.post('/causal-chains', (req, res, next) => ontologyController.analyzeCausalChains(req, res, next));
+
 export default router;

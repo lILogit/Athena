@@ -136,6 +136,24 @@ class ApiService {
   async healthCheck(): Promise<{ status: string; timestamp: number }> {
     return this.request<{ status: string; timestamp: number }>('/api/health');
   }
+
+  // Causal chain analysis
+  async analyzeCausalChains(data: {
+    nodes: string[];
+    edges: Array<{ source: string; target: string; relation: string }>;
+    focus_node?: string;
+  }): Promise<{
+    chains: Array<{
+      nodes: string[];
+      relations: string[];
+      description?: string;
+    }>;
+  }> {
+    return this.request('/api/ontology/causal-chains', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiService();

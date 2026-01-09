@@ -3,6 +3,7 @@ import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
 import { OntologyNode, OntologyEdge, NodeType, RelationType, Graph } from '@kgs/shared';
 import { NODE_COLORS } from '../../utils/nodeColors';
+import { api } from '../../services/api';
 
 const NODE_TYPES: NodeType[] = ['entity', 'event', 'process', 'attribute'];
 const RELATION_TYPES: RelationType[] = ['is-a', 'part-of', 'causes', 'enables', 'requires', 'influences'];
@@ -10,7 +11,7 @@ const RELATION_TYPES: RelationType[] = ['is-a', 'part-of', 'causes', 'enables', 
 export default function ContextPanel() {
   const { currentGraph, updateNode, updateEdge, deleteNode, deleteEdge, updateGraphDescription } = useGraph();
   const { selectedNodeId, selectedEdgeId, toggleContextPanel, clearSelection } = useUI();
-  const [activeTab, setActiveTab] = useState<'properties' | 'notes'>('properties');
+  const [activeTab, setActiveTab] = useState<'properties' | 'notes' | 'causality'>('properties');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const selectedNode = selectedNodeId
@@ -64,23 +65,33 @@ export default function ContextPanel() {
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('properties')}
-          className={`flex-1 px-4 py-3 font-medium transition-colors ${
+          className={`flex-1 px-3 py-3 font-medium transition-colors text-sm ${
             activeTab === 'properties'
               ? 'text-primary border-b-2 border-primary'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Properties
+          Props
         </button>
         <button
           onClick={() => setActiveTab('notes')}
-          className={`flex-1 px-4 py-3 font-medium transition-colors ${
+          className={`flex-1 px-3 py-3 font-medium transition-colors text-sm ${
             activeTab === 'notes'
               ? 'text-primary border-b-2 border-primary'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           Notes
+        </button>
+        <button
+          onClick={() => setActiveTab('causality')}
+          className={`flex-1 px-3 py-3 font-medium transition-colors text-sm ${
+            activeTab === 'causality'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Causality
         </button>
       </div>
 
@@ -121,12 +132,17 @@ export default function ContextPanel() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'notes' ? (
           <NotesPanel
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
             onNodeUpdate={handleNodeUpdate}
             onEdgeUpdate={handleEdgeUpdate}
+          />
+        ) : (
+          <CausalityPanel
+            graph={currentGraph}
+            selectedNodeId={selectedNodeId}
           />
         )}
       </div>
@@ -563,6 +579,197 @@ function GraphNotesPanel({
           <span>{new Date(graph.updated_at * 1000).toLocaleDateString()}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface CausalChain {
+  nodes: string[];
+  relations: string[];
+  description?: string;
+}
+
+function CausalityPanel({
+  graph,
+  selectedNodeId,
+}: {
+  graph: Graph | null;
+  selectedNodeId: string | null;
+}) {
+  const [chains, setChains] = useState<CausalChain[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedNode = selectedNodeId
+    ? graph?.ontology_data.nodes.find((n) => n.id === selectedNodeId)
+    : null;
+
+  async function analyzeCausalChains() {
+    if (!graph || graph.ontology_data.nodes.length === 0) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await api.analyzeCausalChains({
+        nodes: graph.ontology_data.nodes.map((n) => n.label),
+        edges: graph.ontology_data.edges.map((e) => ({
+          source: graph.ontology_data.nodes.find((n) => n.id === e.source)?.label || '',
+          target: graph.ontology_data.nodes.find((n) => n.id === e.target)?.label || '',
+          relation: e.relation,
+        })),
+        focus_node: selectedNode?.label,
+      });
+
+      setChains(result.chains);
+    } catch (err: any) {
+      setError(err.message || 'Failed to analyze causal chains');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (!graph) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <svg
+          className="w-12 h-12 mx-auto mb-3 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
+        </svg>
+        <p>No graph selected</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-900">Causal Chain Analysis</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            {selectedNode
+              ? `Analyzing chains involving "${selectedNode.label}"`
+              : 'Analyzing all possible causal chains'}
+          </p>
+        </div>
+      </div>
+
+      {/* Analyze Button */}
+      <button
+        onClick={analyzeCausalChains}
+        disabled={isLoading || graph.ontology_data.nodes.length < 2}
+        className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {isLoading ? (
+          <>
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Analyzing...
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            Suggest Causal Chains
+          </>
+        )}
+      </button>
+
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      {/* Chains List */}
+      {chains.length > 0 && (
+        <div className="space-y-4">
+          <div className="text-sm font-medium text-gray-700">
+            Found {chains.length} causal chain{chains.length > 1 ? 's' : ''}:
+          </div>
+
+          {chains.map((chain, idx) => (
+            <div
+              key={idx}
+              className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100"
+            >
+              <div className="text-xs font-semibold text-purple-600 uppercase mb-3">
+                Chain {idx + 1}
+              </div>
+
+              {/* Chain Visualization */}
+              <div className="space-y-2">
+                {chain.nodes.map((node, nodeIdx) => (
+                  <div key={nodeIdx}>
+                    {/* Node */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-purple-500" />
+                      <span className="font-medium text-gray-900">{node}</span>
+                    </div>
+
+                    {/* Relation arrow (if not last node) */}
+                    {nodeIdx < chain.nodes.length - 1 && chain.relations[nodeIdx] && (
+                      <div className="flex items-center gap-2 ml-1 my-1">
+                        <div className="w-px h-4 bg-purple-300 ml-[3px]" />
+                        <svg className="w-3 h-3 text-purple-400 -ml-[7px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                        <span className="text-xs text-purple-600 italic">{chain.relations[nodeIdx]}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Description */}
+              {chain.description && (
+                <p className="text-xs text-gray-600 mt-3 pt-3 border-t border-purple-100">
+                  {chain.description}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && chains.length === 0 && !error && (
+        <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
+          <svg
+            className="w-10 h-10 mx-auto mb-2 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+          <p className="text-sm">Click the button above to analyze causal relationships</p>
+          <p className="text-xs mt-1">
+            {graph.ontology_data.nodes.length < 2
+              ? 'Add at least 2 nodes to analyze'
+              : `${graph.ontology_data.nodes.length} nodes available for analysis`}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
