@@ -10,7 +10,7 @@ const RELATION_TYPES: RelationType[] = ['is-a', 'part-of', 'causes', 'enables', 
 
 export default function ContextPanel() {
   const { currentGraph, updateNode, updateEdge, deleteNode, deleteEdge, updateGraphDescription } = useGraph();
-  const { selectedNodeId, selectedEdgeId, toggleContextPanel, clearSelection } = useUI();
+  const { selectedNodeId, selectedNodeIds, selectedEdgeId, toggleContextPanel, clearSelection } = useUI();
   const [activeTab, setActiveTab] = useState<'properties' | 'notes' | 'causality'>('properties');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -142,7 +142,7 @@ export default function ContextPanel() {
         ) : (
           <CausalityPanel
             graph={currentGraph}
-            selectedNodeId={selectedNodeId}
+            selectedNodeIds={selectedNodeIds}
           />
         )}
       </div>
@@ -591,34 +591,46 @@ interface CausalChain {
 
 function CausalityPanel({
   graph,
-  selectedNodeId,
+  selectedNodeIds,
 }: {
   graph: Graph | null;
-  selectedNodeId: string | null;
+  selectedNodeIds: string[];
 }) {
   const [chains, setChains] = useState<CausalChain[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedNode = selectedNodeId
-    ? graph?.ontology_data.nodes.find((n) => n.id === selectedNodeId)
-    : null;
+  // Get selected nodes from the graph
+  const selectedNodes = graph?.ontology_data.nodes.filter((n) => selectedNodeIds.includes(n.id)) || [];
 
   async function analyzeCausalChains() {
-    if (!graph || graph.ontology_data.nodes.length === 0) return;
+    if (!graph) return;
+
+    // Must have at least 2 selected nodes
+    if (selectedNodes.length < 2) {
+      setError('Select at least 2 nodes to analyze causal chains');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
+      // Only use selected nodes
+      const nodeLabels = selectedNodes.map((n) => n.label);
+
+      // Filter edges to only those between selected nodes
+      const relevantEdges = graph.ontology_data.edges.filter((e) =>
+        selectedNodeIds.includes(e.source) && selectedNodeIds.includes(e.target)
+      );
+
       const result = await api.analyzeCausalChains({
-        nodes: graph.ontology_data.nodes.map((n) => n.label),
-        edges: graph.ontology_data.edges.map((e) => ({
+        nodes: nodeLabels,
+        edges: relevantEdges.map((e) => ({
           source: graph.ontology_data.nodes.find((n) => n.id === e.source)?.label || '',
           target: graph.ontology_data.nodes.find((n) => n.id === e.target)?.label || '',
           relation: e.relation,
         })),
-        focus_node: selectedNode?.label,
       });
 
       setChains(result.chains);
@@ -657,17 +669,34 @@ function CausalityPanel({
         <div>
           <h3 className="font-semibold text-gray-900">Causal Chain Analysis</h3>
           <p className="text-xs text-gray-500 mt-1">
-            {selectedNode
-              ? `Analyzing chains involving "${selectedNode.label}"`
-              : 'Analyzing all possible causal chains'}
+            {selectedNodes.length > 0
+              ? `${selectedNodes.length} node${selectedNodes.length > 1 ? 's' : ''} selected`
+              : 'Select nodes to analyze (drag or Shift+click)'}
           </p>
         </div>
       </div>
 
+      {/* Selected Nodes Preview */}
+      {selectedNodes.length > 0 && (
+        <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
+          <div className="text-xs font-medium text-purple-700 mb-2">Selected nodes:</div>
+          <div className="flex flex-wrap gap-1">
+            {selectedNodes.map((node) => (
+              <span
+                key={node.id}
+                className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs"
+              >
+                {node.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Analyze Button */}
       <button
         onClick={analyzeCausalChains}
-        disabled={isLoading || graph.ontology_data.nodes.length < 2}
+        disabled={isLoading || selectedNodes.length < 2}
         className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {isLoading ? (
@@ -762,12 +791,16 @@ function CausalityPanel({
               d="M13 10V3L4 14h7v7l9-11h-7z"
             />
           </svg>
-          <p className="text-sm">Click the button above to analyze causal relationships</p>
-          <p className="text-xs mt-1">
-            {graph.ontology_data.nodes.length < 2
-              ? 'Add at least 2 nodes to analyze'
-              : `${graph.ontology_data.nodes.length} nodes available for analysis`}
-          </p>
+          {selectedNodes.length < 2 ? (
+            <>
+              <p className="text-sm">Select at least 2 nodes to analyze</p>
+              <p className="text-xs mt-1">
+                Drag to select multiple nodes, or Shift+click
+              </p>
+            </>
+          ) : (
+            <p className="text-sm">Click the button above to analyze causal chains</p>
+          )}
         </div>
       )}
     </div>

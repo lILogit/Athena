@@ -12,6 +12,7 @@ import ReactFlow, {
   BackgroundVariant,
   Connection,
   Panel,
+  OnSelectionChangeParams,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -37,7 +38,7 @@ const edgeTypes: EdgeTypes = {
 
 export default function GraphCanvas() {
   const { currentGraph, updateGraph, addNode, addEdge: addGraphEdge, deleteNode, deleteEdge, undo, redo, canUndo, canRedo } = useGraph();
-  const { selectNode, selectEdge, clearSelection, selectedNodeId, selectedEdgeId, contextPanelOpen, toggleContextPanel, openEnrichmentDialog } = useUI();
+  const { selectNode, selectNodes, selectEdge, clearSelection, selectedNodeId, selectedEdgeId, contextPanelOpen, toggleContextPanel, openEnrichmentDialog } = useUI();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -271,6 +272,15 @@ export default function GraphCanvas() {
     setShowLayoutMenu(false);
   }, [clearSelection]);
 
+  // Handle multi-selection changes
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }: OnSelectionChangeParams) => {
+      const nodeIds = selectedNodes.map((n) => n.id);
+      selectNodes(nodeIds);
+    },
+    [selectNodes]
+  );
+
   // Handle edge double click (prevent default behavior that causes crash)
   const onEdgeDoubleClick = useCallback(
     (event: React.MouseEvent, edge: Edge) => {
@@ -440,11 +450,14 @@ export default function GraphCanvas() {
         onEdgeDoubleClick={onEdgeDoubleClick}
         onPaneClick={onPaneClick}
         onConnect={onConnect}
+        onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
         attributionPosition="bottom-left"
         connectOnClick={false}
+        selectionOnDrag
+        multiSelectionKeyCode="Shift"
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />

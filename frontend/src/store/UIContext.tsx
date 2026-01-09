@@ -6,6 +6,7 @@ interface UIState {
   contextPanelOpen: boolean;
   clarificationDialogOpen: boolean;
   selectedNodeId: string | null;
+  selectedNodeIds: string[]; // Multi-select support
   selectedEdgeId: string | null;
 
   // Enrichment mode - adds entities to existing graph
@@ -20,6 +21,7 @@ interface UIState {
   openEnrichmentDialog: (graphId: number) => void;
   closeClarificationDialog: () => void;
   selectNode: (nodeId: string | null) => void;
+  selectNodes: (nodeIds: string[]) => void; // Multi-select
   selectEdge: (edgeId: string | null) => void;
   clearSelection: () => void;
 }
@@ -29,6 +31,7 @@ const useUIStore = create<UIState>((set) => ({
   contextPanelOpen: true,
   clarificationDialogOpen: false,
   selectedNodeId: null,
+  selectedNodeIds: [],
   selectedEdgeId: null,
   enrichmentMode: false,
   enrichGraphId: null,
@@ -40,9 +43,10 @@ const useUIStore = create<UIState>((set) => ({
   openClarificationDialog: () => set({ clarificationDialogOpen: true, enrichmentMode: false, enrichGraphId: null }),
   openEnrichmentDialog: (graphId: number) => set({ clarificationDialogOpen: true, enrichmentMode: true, enrichGraphId: graphId }),
   closeClarificationDialog: () => set({ clarificationDialogOpen: false, enrichmentMode: false, enrichGraphId: null }),
-  selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedEdgeId: null }),
-  selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null }),
-  clearSelection: () => set({ selectedNodeId: null, selectedEdgeId: null }),
+  selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedNodeIds: nodeId ? [nodeId] : [], selectedEdgeId: null }),
+  selectNodes: (nodeIds) => set({ selectedNodeIds: nodeIds, selectedNodeId: nodeIds.length === 1 ? nodeIds[0] : null, selectedEdgeId: null }),
+  selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null, selectedNodeIds: [] }),
+  clearSelection: () => set({ selectedNodeId: null, selectedNodeIds: [], selectedEdgeId: null }),
 }));
 
 // Export the hook directly instead of using context
