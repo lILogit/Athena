@@ -48,6 +48,7 @@ export default function GraphCanvas() {
   const [newEdgeSource, setNewEdgeSource] = useState('');
   const [newEdgeTarget, setNewEdgeTarget] = useState('');
   const [newEdgeRelation, setNewEdgeRelation] = useState<RelationType>('influences');
+  const [showLayoutMenu, setShowLayoutMenu] = useState(false);
 
   // Convert ontology data to React Flow format (without auto-layout)
   useEffect(() => {
@@ -78,11 +79,155 @@ export default function GraphCanvas() {
     }
   }, [currentGraph]);
 
-  // Manual layout function
-  const handleApplyLayout = useCallback(() => {
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
+  // Layout functions for different algorithms
+  const applyLayout = useCallback((layoutType: string) => {
+    let layoutedNodes = [...nodes];
+    const layoutedEdges = [...edges];
+
+    switch (layoutType) {
+      case 'hierarchical-tb': {
+        // Top to Bottom hierarchical
+        const result = getLayoutedElements(nodes, edges, 'TB');
+        layoutedNodes = result.nodes;
+        break;
+      }
+      case 'hierarchical-lr': {
+        // Left to Right hierarchical
+        const result = getLayoutedElements(nodes, edges, 'LR');
+        layoutedNodes = result.nodes;
+        break;
+      }
+      case 'hierarchical-bt': {
+        // Bottom to Top hierarchical
+        const result = getLayoutedElements(nodes, edges, 'BT');
+        layoutedNodes = result.nodes;
+        break;
+      }
+      case 'hierarchical-rl': {
+        // Right to Left hierarchical
+        const result = getLayoutedElements(nodes, edges, 'RL');
+        layoutedNodes = result.nodes;
+        break;
+      }
+      case 'grid': {
+        // Grid layout
+        const cols = Math.ceil(Math.sqrt(nodes.length));
+        layoutedNodes = nodes.map((node, index) => ({
+          ...node,
+          position: {
+            x: (index % cols) * 250 + 50,
+            y: Math.floor(index / cols) * 150 + 50,
+          },
+        }));
+        break;
+      }
+      case 'circular': {
+        // Circular layout
+        const radius = Math.max(200, nodes.length * 40);
+        const centerX = 400;
+        const centerY = 300;
+        layoutedNodes = nodes.map((node, index) => {
+          const angle = (2 * Math.PI * index) / nodes.length;
+          return {
+            ...node,
+            position: {
+              x: centerX + radius * Math.cos(angle),
+              y: centerY + radius * Math.sin(angle),
+            },
+          };
+        });
+        break;
+      }
+      case 'radial': {
+        // Radial layout - root nodes in center, others in rings
+        const centerX = 400;
+        const centerY = 300;
+        const targetIds = new Set(edges.map(e => e.target));
+        const rootNodes = nodes.filter(n => !targetIds.has(n.id));
+        const otherNodes = nodes.filter(n => targetIds.has(n.id));
+
+        // Place root nodes in inner ring
+        const innerRadius = 100;
+        const rootLayouted = rootNodes.map((node, index) => {
+          const angle = (2 * Math.PI * index) / Math.max(rootNodes.length, 1);
+          return {
+            ...node,
+            position: {
+              x: centerX + innerRadius * Math.cos(angle),
+              y: centerY + innerRadius * Math.sin(angle),
+            },
+          };
+        });
+
+        // Place other nodes in outer ring
+        const outerRadius = Math.max(250, otherNodes.length * 30);
+        const otherLayouted = otherNodes.map((node, index) => {
+          const angle = (2 * Math.PI * index) / Math.max(otherNodes.length, 1);
+          return {
+            ...node,
+            position: {
+              x: centerX + outerRadius * Math.cos(angle),
+              y: centerY + outerRadius * Math.sin(angle),
+            },
+          };
+        });
+
+        layoutedNodes = [...rootLayouted, ...otherLayouted];
+        break;
+      }
+      case 'force': {
+        // Simple force-directed simulation
+        const iterations = 50;
+        const k = 150; // Ideal distance
+        const positions = new Map(nodes.map(n => [n.id, { ...n.position }]));
+
+        for (let i = 0; i < iterations; i++) {
+          // Repulsion between all nodes
+          nodes.forEach(n1 => {
+            nodes.forEach(n2 => {
+              if (n1.id !== n2.id) {
+                const p1 = positions.get(n1.id)!;
+                const p2 = positions.get(n2.id)!;
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+                const force = (k * k) / dist;
+                p1.x += (dx / dist) * force * 0.1;
+                p1.y += (dy / dist) * force * 0.1;
+              }
+            });
+          });
+
+          // Attraction along edges
+          edges.forEach(edge => {
+            const p1 = positions.get(edge.source);
+            const p2 = positions.get(edge.target);
+            if (p1 && p2) {
+              const dx = p2.x - p1.x;
+              const dy = p2.y - p1.y;
+              const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+              const force = (dist - k) * 0.05;
+              p1.x += (dx / dist) * force;
+              p1.y += (dy / dist) * force;
+              p2.x -= (dx / dist) * force;
+              p2.y -= (dy / dist) * force;
+            }
+          });
+        }
+
+        layoutedNodes = nodes.map(node => ({
+          ...node,
+          position: positions.get(node.id) || node.position,
+        }));
+        break;
+      }
+      default:
+        break;
+    }
+
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
+    setShowLayoutMenu(false);
   }, [nodes, edges, setNodes, setEdges]);
 
   // Handle node selection
@@ -107,9 +252,10 @@ export default function GraphCanvas() {
     [selectEdge, contextPanelOpen, toggleContextPanel]
   );
 
-  // Handle pane click (clear selection)
+  // Handle pane click (clear selection and close menus)
   const onPaneClick = useCallback(() => {
     clearSelection();
+    setShowLayoutMenu(false);
   }, [clearSelection]);
 
   // Handle edge double click (prevent default behavior that causes crash)
@@ -364,17 +510,105 @@ export default function GraphCanvas() {
           {/* Separator */}
           <div className="w-px h-6 bg-gray-200" />
 
-          {/* Layout Button */}
-          <button
-            onClick={handleApplyLayout}
-            className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm font-medium flex items-center gap-1"
-            title="Auto-arrange nodes"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-            </svg>
-            Layout
-          </button>
+          {/* Layout Button with Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLayoutMenu(!showLayoutMenu)}
+              className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm font-medium flex items-center gap-1"
+              title="Auto-arrange nodes"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+              Layout
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Layout Dropdown Menu */}
+            {showLayoutMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[180px] z-50">
+                <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase">Hierarchical</div>
+                <button
+                  onClick={() => applyLayout('hierarchical-tb')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                  Top to Bottom
+                </button>
+                <button
+                  onClick={() => applyLayout('hierarchical-bt')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  Bottom to Top
+                </button>
+                <button
+                  onClick={() => applyLayout('hierarchical-lr')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                  Left to Right
+                </button>
+                <button
+                  onClick={() => applyLayout('hierarchical-rl')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Right to Left
+                </button>
+
+                <div className="border-t border-gray-100 my-1" />
+                <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase">Other Layouts</div>
+                <button
+                  onClick={() => applyLayout('grid')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                  Grid
+                </button>
+                <button
+                  onClick={() => applyLayout('circular')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                  </svg>
+                  Circular
+                </button>
+                <button
+                  onClick={() => applyLayout('radial')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                    <circle cx="12" cy="12" r="8" strokeWidth={2} strokeDasharray="4 2" />
+                  </svg>
+                  Radial
+                </button>
+                <button
+                  onClick={() => applyLayout('force')}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Force-Directed
+                </button>
+              </div>
+            )}
+          </div>
         </Panel>
       </ReactFlow>
 
