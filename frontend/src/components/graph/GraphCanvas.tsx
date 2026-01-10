@@ -55,35 +55,34 @@ export default function GraphCanvas() {
   const lastLoadedGraphId = useRef<number | null>(null);
 
   // Convert ontology data to React Flow format (without auto-layout)
-  // Only reset positions when graph ID changes or node count changes
+  // Sync when graph changes, preserving positions
   useEffect(() => {
     if (currentGraph) {
       const isNewGraph = lastLoadedGraphId.current !== currentGraph.id;
-      const nodeCountChanged = nodes.length !== currentGraph.ontology_data.nodes.length;
-      const edgeCountChanged = edges.length !== currentGraph.ontology_data.edges.length;
 
-      // Only do a full reset if this is a new graph or node/edge count changed
-      if (isNewGraph || nodeCountChanged || edgeCountChanged) {
-        const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
-        const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
+      const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
+      const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
 
-        // Preserve existing positions if nodes already exist
-        const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
+      // Preserve existing positions if nodes already exist
+      const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
 
-        const nodesWithPositions = flowNodes.map((node, index) => {
-          const existingPos = existingPositions.get(node.id);
-          if (existingPos && existingPos.x !== 0 && existingPos.y !== 0) {
-            return { ...node, position: existingPos };
-          }
-          // Default grid position for new nodes
-          return {
-            ...node,
-            position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
-          };
-        });
+      const nodesWithPositions = flowNodes.map((node, index) => {
+        const existingPos = existingPositions.get(node.id);
+        // Keep existing position if we have one and it's not the origin
+        if (existingPos && (existingPos.x !== 0 || existingPos.y !== 0)) {
+          return { ...node, position: existingPos };
+        }
+        // Default grid position for new nodes
+        return {
+          ...node,
+          position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
+        };
+      });
 
-        setNodes(nodesWithPositions);
-        setEdges(flowEdges);
+      setNodes(nodesWithPositions);
+      setEdges(flowEdges);
+
+      if (isNewGraph) {
         lastLoadedGraphId.current = currentGraph.id;
       }
     } else {
