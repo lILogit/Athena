@@ -54,6 +54,9 @@ export default function GraphCanvas() {
   // Track the last loaded graph ID to prevent unnecessary resets
   const lastLoadedGraphId = useRef<number | null>(null);
 
+  // File input ref for import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Convert ontology data to React Flow format (without auto-layout)
   // Sync when graph changes, preserving positions and selection
   useEffect(() => {
@@ -271,8 +274,11 @@ export default function GraphCanvas() {
 
   // Handle node selection
   const onNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      selectNode(node.id);
+    (event: React.MouseEvent, node: Node) => {
+      // Don't override selection when Shift is held (multi-select mode)
+      if (!event.shiftKey) {
+        selectNode(node.id);
+      }
       if (!contextPanelOpen) {
         toggleContextPanel();
       }
@@ -386,6 +392,74 @@ export default function GraphCanvas() {
       clearSelection();
     }
   }, [selectedNodeId, selectedEdgeId, deleteNode, deleteEdge, clearSelection]);
+
+  // Export graph to JSON file
+  const handleExportGraph = useCallback(() => {
+    if (!currentGraph) return;
+
+    const exportData = {
+      title: currentGraph.title,
+      description: currentGraph.description,
+      ontology_data: currentGraph.ontology_data,
+      exported_at: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentGraph.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_graph.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [currentGraph]);
+
+  // Import graph from JSON file
+  const handleImportGraph = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentGraph) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importedData = JSON.parse(content);
+
+        if (importedData.ontology_data) {
+          // Merge imported nodes and edges with existing ones
+          const existingNodeIds = new Set(currentGraph.ontology_data.nodes.map(n => n.id));
+          const existingEdgeIds = new Set(currentGraph.ontology_data.edges.map(e => e.id));
+
+          // Add new nodes (skip duplicates by ID)
+          const newNodes = importedData.ontology_data.nodes.filter(
+            (n: OntologyNode) => !existingNodeIds.has(n.id)
+          );
+
+          // Add new edges (skip duplicates by ID)
+          const newEdges = importedData.ontology_data.edges.filter(
+            (e: OntologyEdge) => !existingEdgeIds.has(e.id)
+          );
+
+          if (newNodes.length > 0 || newEdges.length > 0) {
+            updateGraph(currentGraph.id, {
+              nodes: [...currentGraph.ontology_data.nodes, ...newNodes],
+              edges: [...currentGraph.ontology_data.edges, ...newEdges],
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to import graph:', error);
+        alert('Failed to import graph. Please ensure the file is a valid JSON graph export.');
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [currentGraph, updateGraph]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -675,6 +749,40 @@ export default function GraphCanvas() {
             </svg>
             Enrich
           </button>
+
+          {/* Separator */}
+          <div className="w-px h-6 bg-gray-200" />
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportGraph}
+            className="px-3 py-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm font-medium flex items-center gap-1"
+            title="Export graph to JSON file"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
+          </button>
+
+          {/* Import Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm font-medium flex items-center gap-1"
+            title="Import graph from JSON file"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportGraph}
+            className="hidden"
+          />
         </Panel>
       </ReactFlow>
 
