@@ -19,6 +19,8 @@ export interface OntologyEdge {
   id: string;
   source: string; // node id
   target: string; // node id
+  sourceHandle?: string; // handle id for connection point
+  targetHandle?: string; // handle id for connection point
   relation: RelationType;
   strength: number; // 0-1
   temporal: boolean;

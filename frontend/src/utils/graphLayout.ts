@@ -64,6 +64,8 @@ export function ontologyEdgesToFlow(edges: OntologyEdge[]): Edge[] {
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    sourceHandle: edge.sourceHandle || null,
+    targetHandle: edge.targetHandle || null,
     type: 'custom',
     data: edge,
     animated: edge.strength > 0.7,

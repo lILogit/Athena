@@ -11,6 +11,7 @@ import ReactFlow, {
   EdgeTypes,
   BackgroundVariant,
   Connection,
+  ConnectionMode,
   Panel,
   OnSelectionChangeParams,
 } from 'reactflow';
@@ -331,6 +332,8 @@ export default function GraphCanvas() {
           id: uuidv4(),
           source: connection.source,
           target: connection.target,
+          sourceHandle: connection.sourceHandle || undefined,
+          targetHandle: connection.targetHandle || undefined,
           relation: 'influences',
           strength: 0.8,
           temporal: false,
@@ -552,6 +555,7 @@ export default function GraphCanvas() {
         onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        connectionMode={ConnectionMode.Loose}
         fitView
         attributionPosition="bottom-left"
         connectOnClick={false}

@@ -18,10 +18,12 @@ export default function ClarificationDialog() {
   const [extractedRelationships, setExtractedRelationships] = useState<Array<{source: string; target: string; relation: string}>>([]);
   const [streamingMessage, setStreamingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
 
+  // Reset state only when dialog transitions from closed to open
   useEffect(() => {
-    if (clarificationDialogOpen) {
-      // Reset state when dialog opens
+    if (clarificationDialogOpen && !wasOpenRef.current) {
+      // Dialog just opened - reset state
       setSessionId(null);
       setMessages([]);
       setInputValue('');
@@ -38,6 +40,7 @@ export default function ClarificationDialog() {
         setExtractedEntities(existingEntities);
       }
     }
+    wasOpenRef.current = clarificationDialogOpen;
   }, [clarificationDialogOpen, enrichmentMode, currentGraph]);
 
   useEffect(() => {
