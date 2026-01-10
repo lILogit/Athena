@@ -55,35 +55,61 @@ export default function GraphCanvas() {
   const lastLoadedGraphId = useRef<number | null>(null);
 
   // Convert ontology data to React Flow format (without auto-layout)
-  // Sync when graph changes, preserving positions
+  // Sync when graph changes, preserving positions and selection
   useEffect(() => {
     if (currentGraph) {
       const isNewGraph = lastLoadedGraphId.current !== currentGraph.id;
+      const nodeCountChanged = nodes.length !== currentGraph.ontology_data.nodes.length;
+      const edgeCountChanged = edges.length !== currentGraph.ontology_data.edges.length;
 
-      const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
-      const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
+      // Full reset only for new graph or count changes (add/remove)
+      if (isNewGraph || nodeCountChanged || edgeCountChanged) {
+        const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
+        const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
 
-      // Preserve existing positions if nodes already exist
-      const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
+        // Preserve existing positions and selection state
+        const existingNodes = new Map(nodes.map(n => [n.id, n]));
 
-      const nodesWithPositions = flowNodes.map((node, index) => {
-        const existingPos = existingPositions.get(node.id);
-        // Keep existing position if we have one and it's not the origin
-        if (existingPos && (existingPos.x !== 0 || existingPos.y !== 0)) {
-          return { ...node, position: existingPos };
-        }
-        // Default grid position for new nodes
-        return {
-          ...node,
-          position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
-        };
-      });
+        const nodesWithPositions = flowNodes.map((node, index) => {
+          const existingNode = existingNodes.get(node.id);
+          if (existingNode) {
+            // Preserve position and selection state
+            return {
+              ...node,
+              position: existingNode.position,
+              selected: existingNode.selected,
+            };
+          }
+          // Default grid position for new nodes
+          return {
+            ...node,
+            position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
+          };
+        });
 
-      setNodes(nodesWithPositions);
-      setEdges(flowEdges);
-
-      if (isNewGraph) {
+        setNodes(nodesWithPositions);
+        setEdges(flowEdges);
         lastLoadedGraphId.current = currentGraph.id;
+      } else {
+        // For property updates only, update data in place to preserve selection
+        setNodes((nds) =>
+          nds.map((node) => {
+            const ontologyNode = currentGraph.ontology_data.nodes.find((n) => n.id === node.id);
+            if (ontologyNode) {
+              return { ...node, data: ontologyNode };
+            }
+            return node;
+          })
+        );
+        setEdges((eds) =>
+          eds.map((edge) => {
+            const ontologyEdge = currentGraph.ontology_data.edges.find((e) => e.id === edge.id);
+            if (ontologyEdge) {
+              return { ...edge, data: ontologyEdge };
+            }
+            return edge;
+          })
+        );
       }
     } else {
       setNodes([]);
