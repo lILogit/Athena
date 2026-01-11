@@ -11,7 +11,9 @@
       "Bash(npm install:*)",
       "Bash(git checkout:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(xargs ls:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

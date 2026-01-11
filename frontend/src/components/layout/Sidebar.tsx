@@ -106,7 +106,20 @@ export default function Sidebar() {
                   onClick={() => handleGraphClick(graph.id)}
                   className="w-full text-left"
                 >
-                  <div className="font-medium text-gray-900 mb-1 pr-6">{graph.title}</div>
+                  <div className="flex items-center gap-2 mb-1 pr-6">
+                    <div className="font-medium text-gray-900 truncate">{graph.title}</div>
+                    {graph.archetype && graph.archetype !== 'general' && (
+                      <span
+                        className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
+                          graph.archetype === 'knowledge-mining'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {graph.archetype === 'knowledge-mining' ? '🔍' : '💡'}
+                      </span>
+                    )}
+                  </div>
                   {graph.description && (
                     <div className="text-sm text-gray-600 line-clamp-2">{graph.description}</div>
                   )}

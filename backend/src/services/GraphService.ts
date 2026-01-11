@@ -1,5 +1,5 @@
 import { db } from '../config/database';
-import { Graph, OntologyData, CreateGraphRequest, UpdateGraphRequest } from '@kgs/shared';
+import { Graph, OntologyData, CreateGraphRequest, UpdateGraphRequest, GraphArchetype, ArchetypeConfig } from '@kgs/shared';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 
@@ -53,18 +53,22 @@ export class GraphService {
   createGraph(userId: number, data: CreateGraphRequest): Graph {
     try {
       const ontologyData = data.ontology_data || { nodes: [], edges: [] };
+      const archetype = data.archetype || 'general';
+      const archetypeConfig = data.archetypeConfig || this.getDefaultArchetypeConfig(archetype);
       const timestamp = Math.floor(Date.now() / 1000);
 
       const result = db
         .prepare(
-          `INSERT INTO graphs (project_id, user_id, title, description, ontology_data, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO graphs (project_id, user_id, title, description, archetype, archetype_config, ontology_data, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           data.project_id,
           userId,
           data.title,
           data.description || null,
+          archetype,
+          JSON.stringify(archetypeConfig),
           JSON.stringify(ontologyData),
           timestamp,
           timestamp
@@ -113,6 +117,16 @@ export class GraphService {
       if (data.description !== undefined) {
         updates.push('description = ?');
         params.push(data.description);
+      }
+
+      if (data.archetype !== undefined) {
+        updates.push('archetype = ?');
+        params.push(data.archetype);
+      }
+
+      if (data.archetypeConfig !== undefined) {
+        updates.push('archetype_config = ?');
+        params.push(JSON.stringify(data.archetypeConfig));
       }
 
       if (data.ontology_data !== undefined) {
@@ -215,18 +229,61 @@ export class GraphService {
    * Convert database row to Graph object
    */
   private rowToGraph(row: any): Graph {
+    let archetypeConfig: ArchetypeConfig | undefined;
+    try {
+      archetypeConfig = row.archetype_config ? JSON.parse(row.archetype_config) : undefined;
+    } catch {
+      archetypeConfig = undefined;
+    }
+
     return {
       id: row.id,
       project_id: row.project_id,
       user_id: row.user_id,
       title: row.title,
       description: row.description,
+      archetype: (row.archetype as GraphArchetype) || 'general',
+      archetypeConfig,
       ontology_data: JSON.parse(row.ontology_data) as OntologyData,
       version: row.version,
       created_at: row.created_at,
       updated_at: row.updated_at,
       is_archived: Boolean(row.is_archived),
     };
+  }
+
+  /**
+   * Get default archetype configuration based on archetype type
+   */
+  private getDefaultArchetypeConfig(archetype: GraphArchetype): ArchetypeConfig {
+    switch (archetype) {
+      case 'knowledge-mining':
+        return {
+          archetype: 'knowledge-mining',
+          layoutPreferences: { algorithm: 'force' },
+          displayOptions: {
+            showClusters: true,
+            showInferredEdges: false,
+            minSimilarityThreshold: 0.3,
+          },
+        };
+      case 'explanation':
+        return {
+          archetype: 'explanation',
+          layoutPreferences: { algorithm: 'concentric' },
+          displayOptions: {
+            complexityLevel: 3,
+            showAnalogies: true,
+            showExamples: true,
+          },
+        };
+      default:
+        return {
+          archetype: 'general',
+          layoutPreferences: { algorithm: 'hierarchical-tb' },
+          displayOptions: {},
+        };
+    }
   }
 }
 

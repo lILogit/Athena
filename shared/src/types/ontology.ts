@@ -6,13 +6,69 @@ export type NodeType = 'entity' | 'event' | 'process' | 'attribute';
 export type RelationType = 'is-a' | 'part-of' | 'causes' | 'enables' | 'requires' | 'influences';
 export type SourceType = 'user-stated' | 'inferred';
 
+// Graph Archetype types
+export type GraphArchetype = 'general' | 'knowledge-mining' | 'explanation';
+
+// Extended node types for specific archetypes
+export type ExtendedNodeType = NodeType | 'cluster' | 'pattern' | 'mechanism' | 'example' | 'analogy' | 'prerequisite';
+
+// Extended relation types for specific archetypes
+export type ExtendedRelationType = RelationType | 'similar-to' | 'clusters-with' | 'explains' | 'exemplifies' | 'analogous-to' | 'prerequisite-for';
+
+// Archetype-specific metadata for nodes
+export interface ArchetypeNodeMetadata {
+  // Knowledge Mining specific
+  clusterLabel?: string;
+  domain?: string;
+  connectionCount?: number;
+
+  // Explanation specific
+  explanationLayer?: number; // 0 = central phenomenon, 1 = direct causes, etc.
+  complexityLevel?: number; // 1-5, used for complexity slider filtering
+}
+
+// Archetype-specific metadata for edges
+export interface ArchetypeEdgeMetadata {
+  // Knowledge Mining specific
+  similarityScore?: number; // 0-1, affects edge thickness
+  isInferred?: boolean;
+
+  // Explanation specific
+  explanationType?: 'causal' | 'compositional' | 'analogical';
+}
+
+// Layout preferences per archetype
+export interface LayoutPreferences {
+  algorithm: string;
+  parameters?: Record<string, any>;
+}
+
+// Archetype configuration stored with graph
+export interface ArchetypeConfig {
+  archetype: GraphArchetype;
+  layoutPreferences: LayoutPreferences;
+  displayOptions: {
+    // Explanation graph specific
+    complexityLevel?: number; // 1-5, controls layer visibility
+    showAnalogies?: boolean;
+    showExamples?: boolean;
+
+    // Knowledge Mining specific
+    showClusters?: boolean;
+    showInferredEdges?: boolean;
+    minSimilarityThreshold?: number; // Filter edges below threshold
+  };
+}
+
 export interface OntologyNode {
   id: string;
   label: string;
   type: NodeType;
+  extendedType?: ExtendedNodeType; // Archetype-specific type (e.g., 'mechanism', 'cluster')
   properties: Record<string, any>;
   confidence: number; // 0-1
   source: SourceType;
+  archetypeMetadata?: ArchetypeNodeMetadata;
 }
 
 export interface OntologyEdge {
@@ -22,9 +78,11 @@ export interface OntologyEdge {
   sourceHandle?: string; // handle id for connection point
   targetHandle?: string; // handle id for connection point
   relation: RelationType;
+  extendedRelation?: ExtendedRelationType; // Archetype-specific relation
   strength: number; // 0-1
   temporal: boolean;
   properties: Record<string, any>;
+  archetypeMetadata?: ArchetypeEdgeMetadata;
 }
 
 export interface OntologyData {
@@ -38,6 +96,8 @@ export interface Graph {
   user_id: number;
   title: string;
   description: string | null;
+  archetype: GraphArchetype; // defaults to 'general'
+  archetypeConfig?: ArchetypeConfig;
   ontology_data: OntologyData;
   version: number;
   created_at: number; // Unix timestamp
@@ -126,12 +186,16 @@ export interface CreateGraphRequest {
   project_id: number;
   title: string;
   description?: string;
+  archetype?: GraphArchetype; // defaults to 'general'
+  archetypeConfig?: ArchetypeConfig;
   ontology_data?: OntologyData;
 }
 
 export interface UpdateGraphRequest {
   title?: string;
   description?: string;
+  archetype?: GraphArchetype;
+  archetypeConfig?: ArchetypeConfig;
   ontology_data?: OntologyData;
 }
 
@@ -171,6 +235,8 @@ export interface ClarificationMessageRequest {
 export interface FinalizeClarificationRequest {
   session_id: number;
   title?: string;
+  archetype?: GraphArchetype; // Graph archetype type
+  archetypeConfig?: ArchetypeConfig; // Archetype-specific configuration
   enrich_graph_id?: number; // If provided, merge into existing graph instead of creating new
 }
 

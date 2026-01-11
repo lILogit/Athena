@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS graphs (
   user_id INTEGER NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
+  archetype TEXT NOT NULL DEFAULT 'general',
+  archetype_config TEXT DEFAULT '{}',
   ontology_data TEXT NOT NULL DEFAULT '{"nodes":[],"edges":[]}',
   version INTEGER DEFAULT 1,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -75,6 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_graphs_project_id ON graphs(project_id);
 CREATE INDEX IF NOT EXISTS idx_graphs_user_id ON graphs(user_id);
 CREATE INDEX IF NOT EXISTS idx_graphs_created_at ON graphs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_graphs_is_archived ON graphs(is_archived);
+CREATE INDEX IF NOT EXISTS idx_graphs_archetype ON graphs(archetype);
 
 CREATE INDEX IF NOT EXISTS idx_graph_versions_graph_id ON graph_versions(graph_id);
 CREATE INDEX IF NOT EXISTS idx_graph_versions_version ON graph_versions(graph_id, version);

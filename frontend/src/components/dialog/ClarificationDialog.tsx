@@ -3,11 +3,12 @@ import { useUI } from '../../store/UIContext';
 import { useGraph } from '../../store/GraphContext';
 import { Message, ExtractedEntity } from '@kgs/shared';
 import { api } from '../../services/api';
+import ArchetypeSelector from './ArchetypeSelector';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function ClarificationDialog() {
-  const { clarificationDialogOpen, closeClarificationDialog, enrichmentMode } = useUI();
+  const { clarificationDialogOpen, closeClarificationDialog, enrichmentMode, archetypeSelectionPhase, selectedArchetype } = useUI();
   const { loadGraphs, currentGraph, addNode, addEdge } = useGraph();
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -227,10 +228,11 @@ export default function ClarificationDialog() {
 
         closeClarificationDialog();
       } else {
-        // Create new graph
+        // Create new graph with selected archetype
         const result = await api.finalizeClarification({
           session_id: sessionId,
           title: `Graph - ${new Date().toLocaleDateString()}`,
+          archetype: selectedArchetype,
         });
 
         // Reload graphs and close dialog
@@ -259,12 +261,18 @@ export default function ClarificationDialog() {
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
-              {enrichmentMode ? 'Enrich Knowledge Graph' : 'Create Knowledge Graph'}
+              {enrichmentMode
+                ? 'Enrich Knowledge Graph'
+                : archetypeSelectionPhase
+                  ? 'New Knowledge Graph'
+                  : 'Create Knowledge Graph'}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               {enrichmentMode
                 ? `Add new concepts to "${currentGraph?.title}". I'll extract entities and relationships from your input.`
-                : "Describe your idea and I'll help extract a structured ontology"}
+                : archetypeSelectionPhase
+                  ? 'Choose the type of graph that best fits your needs'
+                  : "Describe your idea and I'll help extract a structured ontology"}
             </p>
           </div>
           <button
@@ -277,7 +285,16 @@ export default function ClarificationDialog() {
           </button>
         </div>
 
-        {/* Main Content Area */}
+        {/* Archetype Selection Phase */}
+        {archetypeSelectionPhase && !enrichmentMode && (
+          <div className="flex-1 overflow-y-auto">
+            <ArchetypeSelector />
+          </div>
+        )}
+
+        {/* Main Content Area - shown after archetype selection or in enrichment mode */}
+        {(!archetypeSelectionPhase || enrichmentMode) && (
+          <>
         <div className="flex-1 flex overflow-hidden">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -426,6 +443,8 @@ export default function ClarificationDialog() {
             )}
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

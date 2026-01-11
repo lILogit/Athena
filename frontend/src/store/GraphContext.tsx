@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { create } from 'zustand';
-import { Graph, OntologyData, OntologyNode, OntologyEdge } from '@kgs/shared';
+import { Graph, OntologyData, OntologyNode, OntologyEdge, ArchetypeConfig, GraphArchetype } from '@kgs/shared';
 import { api } from '../services/api';
 
 const MAX_HISTORY_SIZE = 50;
@@ -31,6 +31,11 @@ interface GraphState {
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
   deleteGraph: (graphId: number) => Promise<void>;
+
+  // Archetype config actions
+  updateArchetypeConfig: (config: Partial<ArchetypeConfig>) => void;
+  setComplexityLevel: (level: number) => void;
+  updateGraphArchetype: (archetype: GraphArchetype) => void;
 
   // Undo/Redo actions
   undo: () => void;
@@ -328,6 +333,120 @@ const useGraphStore = create<GraphState>((set, get) => ({
       set({ error: error.message });
       throw error;
     }
+  },
+
+  updateArchetypeConfig: (config) => {
+    const { currentGraph } = get();
+    if (!currentGraph) return;
+
+    const currentConfig = currentGraph.archetypeConfig || {
+      archetype: currentGraph.archetype || 'general',
+      layoutPreferences: { algorithm: 'dagre' },
+      displayOptions: {},
+    };
+
+    const newConfig: ArchetypeConfig = {
+      ...currentConfig,
+      ...config,
+      displayOptions: {
+        ...currentConfig.displayOptions,
+        ...config.displayOptions,
+      },
+      layoutPreferences: {
+        ...currentConfig.layoutPreferences,
+        ...config.layoutPreferences,
+      },
+    };
+
+    set({
+      currentGraph: {
+        ...currentGraph,
+        archetypeConfig: newConfig,
+      },
+    });
+
+    // Save to server
+    api.updateGraph(currentGraph.id, { archetypeConfig: newConfig }).catch((error: any) => {
+      set({ error: error.message });
+    });
+  },
+
+  setComplexityLevel: (level) => {
+    const { currentGraph } = get();
+    if (!currentGraph) return;
+
+    const currentConfig = currentGraph.archetypeConfig || {
+      archetype: currentGraph.archetype || 'general',
+      layoutPreferences: { algorithm: 'dagre' },
+      displayOptions: {},
+    };
+
+    const newConfig: ArchetypeConfig = {
+      ...currentConfig,
+      displayOptions: {
+        ...currentConfig.displayOptions,
+        complexityLevel: level,
+      },
+    };
+
+    set({
+      currentGraph: {
+        ...currentGraph,
+        archetypeConfig: newConfig,
+      },
+    });
+
+    // Save to server
+    api.updateGraph(currentGraph.id, { archetypeConfig: newConfig }).catch((error: any) => {
+      set({ error: error.message });
+    });
+  },
+
+  updateGraphArchetype: (archetype) => {
+    const { currentGraph } = get();
+    if (!currentGraph) return;
+
+    // Create default config for the archetype
+    const defaultConfigs: Record<GraphArchetype, ArchetypeConfig> = {
+      general: {
+        archetype: 'general',
+        layoutPreferences: { algorithm: 'dagre' },
+        displayOptions: {},
+      },
+      'knowledge-mining': {
+        archetype: 'knowledge-mining',
+        layoutPreferences: { algorithm: 'force-directed' },
+        displayOptions: {
+          showClusters: true,
+          showInferredEdges: true,
+          minSimilarityThreshold: 0.3,
+        },
+      },
+      explanation: {
+        archetype: 'explanation',
+        layoutPreferences: { algorithm: 'concentric' },
+        displayOptions: {
+          complexityLevel: 3,
+          showAnalogies: true,
+          showExamples: true,
+        },
+      },
+    };
+
+    const newConfig = defaultConfigs[archetype];
+
+    set({
+      currentGraph: {
+        ...currentGraph,
+        archetype,
+        archetypeConfig: newConfig,
+      },
+    });
+
+    // Save to server
+    api.updateGraph(currentGraph.id, { archetype, archetypeConfig: newConfig }).catch((error: any) => {
+      set({ error: error.message });
+    });
   },
 
   undo: () => {

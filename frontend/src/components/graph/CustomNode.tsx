@@ -1,23 +1,55 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { OntologyNode } from '@kgs/shared';
-import { getNodeColor } from '../../utils/nodeColors';
+import { getNodeColor, getExtendedNodeColor, getDomainColor, getNodeSize } from '../../utils/nodeColors';
 
 const handleStyle = "!w-2 !h-2 !min-w-0 !min-h-0 !bg-gray-400 hover:!bg-gray-600 hover:!scale-150 !transition-all";
 
+// Icons for extended types
+const extendedTypeIcons: Record<string, string> = {
+  mechanism: '⚙️',
+  example: '📝',
+  analogy: '💡',
+  prerequisite: '🔒',
+  cluster: '🔷',
+  pattern: '✨',
+};
+
 function CustomNode({ data, selected }: NodeProps<OntologyNode>) {
-  const colors = getNodeColor(data.type);
+  // Get colors based on extended type, domain, or base type
+  const metadata = data.archetypeMetadata;
+  const extendedType = data.extendedType;
+
+  let colors;
+  if (extendedType) {
+    colors = getExtendedNodeColor(extendedType, data.type);
+  } else if (metadata?.domain) {
+    colors = getDomainColor(metadata.domain);
+  } else {
+    colors = getNodeColor(data.type);
+  }
+
+  // Calculate dynamic size for Knowledge Mining graphs
+  const connectionCount = metadata?.connectionCount || 0;
+  const nodeSize = connectionCount > 0 ? getNodeSize(connectionCount) : { width: 180, height: 70 };
+
+  // Get layer info for Explanation graphs
+  const explanationLayer = metadata?.explanationLayer;
+
+  // Get icon for extended type
+  const typeIcon = extendedType ? extendedTypeIcons[extendedType] : null;
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg shadow-lg transition-all ${
+      className={`relative px-4 py-3 rounded-lg shadow-lg transition-all ${
         selected ? 'ring-2 ring-primary ring-offset-2' : ''
-      }`}
+      } ${extendedType === 'cluster' ? 'border-2 border-dashed' : ''}`}
       style={{
         backgroundColor: colors.bg,
         color: colors.text,
-        minWidth: '180px',
-        maxWidth: '220px',
+        borderColor: extendedType === 'cluster' ? colors.border : undefined,
+        minWidth: `${nodeSize.width}px`,
+        maxWidth: `${nodeSize.width + 40}px`,
         opacity: 0.85 + data.confidence * 0.15,
       }}
     >
@@ -85,12 +117,40 @@ function CustomNode({ data, selected }: NodeProps<OntologyNode>) {
         style={{ top: '70%' }}
       />
 
-      <div className="font-medium text-sm mb-1 break-words">{data.label}</div>
+      {/* Layer badge for Explanation graphs */}
+      {explanationLayer !== undefined && explanationLayer >= 0 && (
+        <div
+          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-gray-700 text-white text-xs flex items-center justify-center font-medium"
+          title={`Layer ${explanationLayer}`}
+        >
+          {explanationLayer}
+        </div>
+      )}
+
+      {/* Node label with optional icon */}
+      <div className="font-medium text-sm mb-1 break-words flex items-center gap-1">
+        {typeIcon && <span>{typeIcon}</span>}
+        {data.label}
+      </div>
 
       <div className="flex items-center justify-between text-xs opacity-80">
-        <span className="capitalize">{data.type}</span>
+        <span className="capitalize">{extendedType || data.type}</span>
         <span>{(data.confidence * 100).toFixed(0)}%</span>
       </div>
+
+      {/* Connection count badge for Knowledge Mining */}
+      {connectionCount > 0 && (
+        <div className="mt-1 text-xs opacity-70">
+          {connectionCount} connection{connectionCount !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {/* Domain badge */}
+      {metadata?.domain && (
+        <div className="mt-1 text-xs px-1.5 py-0.5 bg-white/20 rounded inline-block">
+          {metadata.domain}
+        </div>
+      )}
 
       {data.source === 'inferred' && (
         <div className="mt-1 text-xs opacity-70 italic">Inferred</div>

@@ -1,4 +1,4 @@
-import { NodeType } from '@kgs/shared';
+import { NodeType, ExtendedNodeType } from '@kgs/shared';
 
 export const NODE_COLORS: Record<NodeType, { bg: string; text: string; border: string }> = {
   entity: {
@@ -23,6 +23,54 @@ export const NODE_COLORS: Record<NodeType, { bg: string; text: string; border: s
   },
 };
 
+// Explanation graph extended node colors
+export const EXPLANATION_NODE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  mechanism: {
+    bg: '#3B82F6',
+    text: '#EFF6FF',
+    border: '#2563EB',
+  },
+  example: {
+    bg: '#10B981',
+    text: '#ECFDF5',
+    border: '#059669',
+  },
+  analogy: {
+    bg: '#F59E0B',
+    text: '#FFF7ED',
+    border: '#D97706',
+  },
+  prerequisite: {
+    bg: '#6B7280',
+    text: '#F9FAFB',
+    border: '#4B5563',
+  },
+};
+
+// Knowledge Mining graph extended node colors
+export const KNOWLEDGE_MINING_NODE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  cluster: {
+    bg: '#8B5CF6',
+    text: '#F5F3FF',
+    border: '#7C3AED',
+  },
+  pattern: {
+    bg: '#F59E0B',
+    text: '#FFF7ED',
+    border: '#D97706',
+  },
+};
+
+// Domain-based colors for Knowledge Mining
+export const DOMAIN_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  science: { bg: '#3B82F6', text: '#EFF6FF', border: '#2563EB' },
+  philosophy: { bg: '#8B5CF6', text: '#F5F3FF', border: '#7C3AED' },
+  technology: { bg: '#10B981', text: '#ECFDF5', border: '#059669' },
+  art: { bg: '#EC4899', text: '#FDF2F8', border: '#DB2777' },
+  history: { bg: '#F97316', text: '#FFF7ED', border: '#EA580C' },
+  default: { bg: '#6B7280', text: '#F9FAFB', border: '#4B5563' },
+};
+
 export const EDGE_COLORS: Record<string, string> = {
   'is-a': '#1F2937',
   'part-of': '#6B7280',
@@ -30,12 +78,56 @@ export const EDGE_COLORS: Record<string, string> = {
   'enables': '#10B981',
   'requires': '#F59E0B',
   'influences': '#8B5CF6',
+  // Extended relation colors
+  'similar-to': '#3B82F6',
+  'clusters-with': '#8B5CF6',
+  'explains': '#10B981',
+  'exemplifies': '#10B981',
+  'analogous-to': '#F59E0B',
+  'prerequisite-for': '#6B7280',
 };
 
 export function getNodeColor(type: NodeType) {
   return NODE_COLORS[type] || NODE_COLORS.entity;
 }
 
+export function getExtendedNodeColor(extendedType: ExtendedNodeType | undefined, baseType: NodeType) {
+  if (!extendedType) {
+    return getNodeColor(baseType);
+  }
+
+  // Check explanation colors
+  if (EXPLANATION_NODE_COLORS[extendedType]) {
+    return EXPLANATION_NODE_COLORS[extendedType];
+  }
+
+  // Check knowledge mining colors
+  if (KNOWLEDGE_MINING_NODE_COLORS[extendedType]) {
+    return KNOWLEDGE_MINING_NODE_COLORS[extendedType];
+  }
+
+  // Fall back to base type
+  return getNodeColor(baseType);
+}
+
+export function getDomainColor(domain: string | undefined) {
+  if (!domain) return DOMAIN_COLORS.default;
+  return DOMAIN_COLORS[domain.toLowerCase()] || DOMAIN_COLORS.default;
+}
+
 export function getEdgeColor(relation: string) {
   return EDGE_COLORS[relation] || EDGE_COLORS['is-a'];
+}
+
+/**
+ * Calculate node size based on connection count for Knowledge Mining graphs
+ */
+export function getNodeSize(connectionCount: number): { width: number; height: number } {
+  const baseWidth = 180;
+  const baseHeight = 70;
+  const scale = Math.min(1 + connectionCount * 0.1, 2); // Max 2x size
+  return {
+    width: Math.round(baseWidth * scale),
+    height: Math.round(baseHeight * scale),
+  };
 }

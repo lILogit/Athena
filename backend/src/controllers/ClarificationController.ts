@@ -148,7 +148,7 @@ export class ClarificationController {
    */
   async finalize(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { session_id, title, enrich_graph_id } = req.body as FinalizeClarificationRequest;
+      const { session_id, title, archetype, archetypeConfig, enrich_graph_id } = req.body as FinalizeClarificationRequest;
 
       if (!session_id) {
         throw new AppError(400, 'INVALID_INPUT', 'session_id is required');
@@ -194,6 +194,8 @@ export class ClarificationController {
         project_id: projectId,
         title: title || `Graph from ${new Date().toLocaleDateString()}`,
         description: `Created from clarification dialog`,
+        archetype: archetype || 'general',
+        archetypeConfig,
         ontology_data: ontologyData,
       });
 

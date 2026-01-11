@@ -19,12 +19,15 @@ import 'reactflow/dist/style.css';
 
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
+import ComplexitySlider from './ComplexitySlider';
 import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
 import {
   getLayoutedElements,
   ontologyNodesToFlow,
   ontologyEdgesToFlow,
+  getKnowledgeMiningLayout,
+  getExplanationLayout,
 } from '../../utils/graphLayout';
 import { OntologyNode, OntologyEdge, NodeType, RelationType } from '@kgs/shared';
 import { v4 as uuidv4 } from 'uuid';
@@ -262,6 +265,18 @@ export default function GraphCanvas() {
           ...node,
           position: positions.get(node.id) || node.position,
         }));
+        break;
+      }
+      case 'knowledge-mining': {
+        // Knowledge Mining layout: force-directed with cluster awareness
+        const kmResult = getKnowledgeMiningLayout(nodes, edges);
+        layoutedNodes = kmResult.nodes;
+        break;
+      }
+      case 'explanation': {
+        // Explanation layout: concentric circles by layer
+        const expResult = getExplanationLayout(nodes, edges);
+        layoutedNodes = expResult.nodes;
         break;
       }
       default:
@@ -577,6 +592,29 @@ export default function GraphCanvas() {
           className="!bg-white !border !border-gray-200"
         />
 
+        {/* Complexity Slider for Explanation graphs */}
+        {currentGraph?.archetype === 'explanation' && (
+          <Panel position="bottom-left" className="ml-12 mb-4">
+            <ComplexitySlider />
+          </Panel>
+        )}
+
+        {/* Archetype badge */}
+        {currentGraph?.archetype && currentGraph.archetype !== 'general' && (
+          <Panel position="top-left" className="ml-12">
+            <div className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              currentGraph.archetype === 'knowledge-mining'
+                ? 'bg-purple-100 text-purple-800'
+                : 'bg-amber-100 text-amber-800'
+            }`}>
+              <span>
+                {currentGraph.archetype === 'knowledge-mining' ? '🔍' : '💡'}
+              </span>
+              {currentGraph.archetype === 'knowledge-mining' ? 'Knowledge Mining' : 'Explanation'}
+            </div>
+          </Panel>
+        )}
+
         {/* Toolbar Panel */}
         <Panel position="top-center" className="bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex gap-2">
           {/* Undo/Redo */}
@@ -735,6 +773,32 @@ export default function GraphCanvas() {
                   </svg>
                   Force-Directed
                 </button>
+
+                {/* Archetype-specific layouts */}
+                {currentGraph?.archetype && currentGraph.archetype !== 'general' && (
+                  <>
+                    <div className="border-t border-gray-100 my-1" />
+                    <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase">Archetype Layout</div>
+                    {currentGraph.archetype === 'knowledge-mining' && (
+                      <button
+                        onClick={() => applyLayout('knowledge-mining')}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="w-4 h-4 text-center">🔍</span>
+                        Knowledge Mining
+                      </button>
+                    )}
+                    {currentGraph.archetype === 'explanation' && (
+                      <button
+                        onClick={() => applyLayout('explanation')}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="w-4 h-4 text-center">💡</span>
+                        Explanation (Concentric)
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
