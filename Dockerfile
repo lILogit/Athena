@@ -42,6 +42,9 @@ RUN npm ci --workspace=shared --omit=dev && \
 # Copy built backend
 COPY --from=builder /app/backend/dist ./backend/dist
 
+# Copy SQL schema and migrations (needed at runtime)
+COPY --from=builder /app/backend/src/db ./backend/dist/db
+
 # Copy built frontend (to be served by backend or nginx)
 COPY --from=builder /app/frontend/dist ./frontend/dist
 
