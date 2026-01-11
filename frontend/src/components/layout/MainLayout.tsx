@@ -4,13 +4,26 @@ import Sidebar from './Sidebar';
 import GraphCanvas from '../graph/GraphCanvas';
 import ContextPanel from './ContextPanel';
 import ClarificationDialog from '../dialog/ClarificationDialog';
+import AIChatWindow from '../chat/AIChatWindow';
+import CausalHistoryViewer from '../history/CausalHistoryViewer';
 import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
 
 export default function MainLayout() {
   const { id } = useParams<{ id: string }>();
   const { loadGraph, loadGraphs } = useGraph();
-  const { sidebarOpen, contextPanelOpen, toggleSidebar, openClarificationDialog } = useUI();
+  const {
+    sidebarOpen,
+    contextPanelOpen,
+    toggleSidebar,
+    openClarificationDialog,
+    chatWindowOpen,
+    historyViewerOpen,
+    toggleChatWindow,
+    toggleHistoryViewer,
+    closeChatWindow,
+    closeHistoryViewer,
+  } = useUI();
 
   useEffect(() => {
     // Load graphs on mount
@@ -51,6 +64,36 @@ export default function MainLayout() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* History Viewer Toggle */}
+            <button
+              onClick={toggleHistoryViewer}
+              className={`p-2 rounded-lg transition-colors ${
+                historyViewerOpen
+                  ? 'bg-purple-100 text-purple-600'
+                  : 'hover:bg-gray-100 text-gray-600'
+              }`}
+              title="Graph History"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+
+            {/* AI Chat Toggle */}
+            <button
+              onClick={toggleChatWindow}
+              className={`p-2 rounded-lg transition-colors ${
+                chatWindowOpen
+                  ? 'bg-purple-100 text-purple-600'
+                  : 'hover:bg-gray-100 text-gray-600'
+              }`}
+              title="AI Assistant"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+            </button>
+
             <button
               onClick={openClarificationDialog}
               className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-teal-600 transition-colors font-medium"
@@ -77,6 +120,12 @@ export default function MainLayout() {
 
       {/* Clarification Dialog */}
       <ClarificationDialog />
+
+      {/* AI Chat Window */}
+      <AIChatWindow isOpen={chatWindowOpen} onClose={closeChatWindow} />
+
+      {/* Causal History Viewer */}
+      <CausalHistoryViewer isOpen={historyViewerOpen} onClose={closeHistoryViewer} />
     </div>
   );
 }

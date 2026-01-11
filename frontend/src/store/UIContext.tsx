@@ -18,6 +18,10 @@ interface UIState {
   selectedArchetype: GraphArchetype;
   archetypeSelectionPhase: boolean; // Show archetype selector before clarification
 
+  // Chat and History
+  chatWindowOpen: boolean;
+  historyViewerOpen: boolean;
+
   // Actions
   toggleSidebar: () => void;
   toggleContextPanel: () => void;
@@ -31,6 +35,12 @@ interface UIState {
   clearSelection: () => void;
   setSelectedArchetype: (archetype: GraphArchetype) => void;
   startClarificationPhase: () => void; // Move from archetype selection to clarification
+  toggleChatWindow: () => void;
+  toggleHistoryViewer: () => void;
+  openChatWindow: () => void;
+  closeChatWindow: () => void;
+  openHistoryViewer: () => void;
+  closeHistoryViewer: () => void;
 }
 
 const useUIStore = create<UIState>((set) => ({
@@ -44,6 +54,8 @@ const useUIStore = create<UIState>((set) => ({
   enrichGraphId: null,
   selectedArchetype: 'general',
   archetypeSelectionPhase: true,
+  chatWindowOpen: false,
+  historyViewerOpen: false,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   toggleContextPanel: () => set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
@@ -75,6 +87,12 @@ const useUIStore = create<UIState>((set) => ({
   clearSelection: () => set({ selectedNodeId: null, selectedNodeIds: [], selectedEdgeId: null }),
   setSelectedArchetype: (archetype) => set({ selectedArchetype: archetype }),
   startClarificationPhase: () => set({ archetypeSelectionPhase: false }),
+  toggleChatWindow: () => set((state) => ({ chatWindowOpen: !state.chatWindowOpen })),
+  toggleHistoryViewer: () => set((state) => ({ historyViewerOpen: !state.historyViewerOpen })),
+  openChatWindow: () => set({ chatWindowOpen: true }),
+  closeChatWindow: () => set({ chatWindowOpen: false }),
+  openHistoryViewer: () => set({ historyViewerOpen: true }),
+  closeHistoryViewer: () => set({ historyViewerOpen: false }),
 }));
 
 // Export the hook directly instead of using context

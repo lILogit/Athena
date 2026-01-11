@@ -346,3 +346,117 @@ export interface SSEErrorEvent {
 }
 
 export type SSEEvent = SSETokenEvent | SSEEntitiesEvent | SSERelationshipsEvent | SSEDoneEvent | SSEErrorEvent;
+
+// AI Chat types
+export type AIModel = 'claude-sonnet' | 'claude-opus' | 'claude-haiku';
+
+export interface ChatMessage extends Message {
+  id: string;
+  model?: AIModel;
+  graphContext?: number; // graph_id if chat is in context of a graph
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  model: AIModel;
+  graphId?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChatRequest {
+  message: string;
+  model?: AIModel;
+  graphId?: number; // Optional graph context
+  sessionId?: string;
+  includeHistory?: boolean; // Include graph change history for recommendations
+}
+
+export interface ChatResponse {
+  message: ChatMessage;
+  sessionId: string;
+  recommendations?: NextStepRecommendation[];
+}
+
+// Graph Change History types
+export type ChangeType =
+  | 'node_added'
+  | 'node_updated'
+  | 'node_deleted'
+  | 'edge_added'
+  | 'edge_updated'
+  | 'edge_deleted'
+  | 'layout_changed'
+  | 'archetype_changed'
+  | 'batch_update';
+
+export interface GraphChange {
+  id: string;
+  graphId: number;
+  userId: number;
+  changeType: ChangeType;
+  timestamp: number;
+  description: string;
+
+  // Affected elements
+  affectedNodeIds?: string[];
+  affectedEdgeIds?: string[];
+
+  // Change details
+  previousState?: any;
+  newState?: any;
+
+  // Causal chain
+  causedBy?: string; // ID of the change that caused this
+  causes?: string[]; // IDs of changes caused by this
+}
+
+export interface GraphChangeHistory {
+  graphId: number;
+  changes: GraphChange[];
+  patterns?: ChangePattern[];
+}
+
+export interface ChangePattern {
+  id: string;
+  name: string;
+  description: string;
+  frequency: number;
+  changeSequence: ChangeType[];
+  lastOccurred: number;
+}
+
+export interface NextStepRecommendation {
+  id: string;
+  type: 'add_node' | 'add_edge' | 'refine_node' | 'apply_layout' | 'explore_pattern' | 'custom';
+  title: string;
+  description: string;
+  confidence: number;
+  reasoning: string;
+  suggestedAction?: {
+    nodeType?: string;
+    edgeType?: string;
+    targetNodeId?: string;
+    layoutType?: string;
+  };
+}
+
+// Causal History Viewer types
+export interface CausalHistoryNode {
+  id: string;
+  change: GraphChange;
+  depth: number; // Depth in causal tree
+  children: string[]; // IDs of caused changes
+  parent?: string; // ID of causing change
+}
+
+export interface CausalHistoryTree {
+  rootNodes: string[]; // IDs of root changes (no parent)
+  nodes: Record<string, CausalHistoryNode>;
+  timeRange: {
+    start: number;
+    end: number;
+  };
+}

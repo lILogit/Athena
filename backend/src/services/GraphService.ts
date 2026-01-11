@@ -1,7 +1,8 @@
 import { db } from '../config/database';
-import { Graph, OntologyData, CreateGraphRequest, UpdateGraphRequest, GraphArchetype, ArchetypeConfig } from '@kgs/shared';
+import { Graph, OntologyData, CreateGraphRequest, UpdateGraphRequest, GraphArchetype, ArchetypeConfig, OntologyNode, OntologyEdge } from '@kgs/shared';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
+import { historyService } from './HistoryService';
 
 export class GraphService {
   /**
@@ -149,6 +150,9 @@ export class GraphService {
           userId,
           timestamp
         );
+
+        // Log changes to history service
+        this.logOntologyChanges(graphId, userId, existing.ontology_data, data.ontology_data);
       }
 
       if (updates.length > 0) {
@@ -250,6 +254,88 @@ export class GraphService {
       updated_at: row.updated_at,
       is_archived: Boolean(row.is_archived),
     };
+  }
+
+  /**
+   * Log ontology changes to history service
+   */
+  private logOntologyChanges(
+    graphId: number,
+    userId: number,
+    oldData: OntologyData,
+    newData: OntologyData
+  ): void {
+    try {
+      const oldNodes = new Map(oldData.nodes.map(n => [n.id, n]));
+      const newNodes = new Map(newData.nodes.map(n => [n.id, n]));
+      const oldEdges = new Map(oldData.edges.map(e => [e.id, e]));
+      const newEdges = new Map(newData.edges.map(e => [e.id, e]));
+
+      // Check for added/deleted/updated nodes
+      for (const [id, node] of newNodes) {
+        const oldNode = oldNodes.get(id);
+        if (!oldNode) {
+          historyService.logNodeAdded(graphId, userId, node);
+        } else if (JSON.stringify(oldNode) !== JSON.stringify(node)) {
+          // Check if position changed (don't log position-only changes)
+          const oldWithoutPos = { ...oldNode, position: undefined };
+          const newWithoutPos = { ...node, position: undefined };
+          if (JSON.stringify(oldWithoutPos) !== JSON.stringify(newWithoutPos)) {
+            historyService.logNodeUpdated(graphId, userId, id, oldNode, node);
+          }
+        }
+      }
+
+      for (const [id, node] of oldNodes) {
+        if (!newNodes.has(id)) {
+          historyService.logNodeDeleted(graphId, userId, node);
+        }
+      }
+
+      // Check for added/deleted/updated edges
+      for (const [id, edge] of newEdges) {
+        const oldEdge = oldEdges.get(id);
+        if (!oldEdge) {
+          const sourceNode = newNodes.get(edge.source);
+          const targetNode = newNodes.get(edge.target);
+          historyService.logEdgeAdded(
+            graphId,
+            userId,
+            edge,
+            sourceNode?.label || 'Unknown',
+            targetNode?.label || 'Unknown'
+          );
+        } else if (JSON.stringify(oldEdge) !== JSON.stringify(edge)) {
+          const sourceNode = newNodes.get(edge.source);
+          const targetNode = newNodes.get(edge.target);
+          historyService.logEdgeUpdated(
+            graphId,
+            userId,
+            id,
+            oldEdge,
+            edge,
+            sourceNode?.label || 'Unknown',
+            targetNode?.label || 'Unknown'
+          );
+        }
+      }
+
+      for (const [id, edge] of oldEdges) {
+        if (!newEdges.has(id)) {
+          const sourceNode = oldNodes.get(edge.source);
+          const targetNode = oldNodes.get(edge.target);
+          historyService.logEdgeDeleted(
+            graphId,
+            userId,
+            edge,
+            sourceNode?.label || 'Unknown',
+            targetNode?.label || 'Unknown'
+          );
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to log ontology changes:', error);
+    }
   }
 
   /**

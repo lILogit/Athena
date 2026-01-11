@@ -14,6 +14,13 @@ import {
   GraphArchetype,
   ExtendedNodeType,
   ExtendedRelationType,
+  AIModel,
+  ChatSession,
+  ChatRequest,
+  ChatResponse,
+  GraphChangeHistory,
+  CausalHistoryTree,
+  NextStepRecommendation,
 } from '@kgs/shared';
 
 // Suggestion types
@@ -204,6 +211,57 @@ class ApiService {
 
   async getEdgeTypes(archetype: GraphArchetype): Promise<{ edgeTypes: QuickEdgeType[] }> {
     return this.request(`/api/suggestions/edge-types/${archetype}`);
+  }
+
+  // Chat
+  async sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+    return this.request<ChatResponse>('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getChatSessions(): Promise<{ sessions: ChatSession[] }> {
+    return this.request<{ sessions: ChatSession[] }>('/api/chat/sessions');
+  }
+
+  async getChatSession(sessionId: string): Promise<{ session: ChatSession }> {
+    return this.request<{ session: ChatSession }>(`/api/chat/sessions/${sessionId}`);
+  }
+
+  async deleteChatSession(sessionId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/chat/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Graph History
+  async getGraphHistory(graphId: number): Promise<{ history: GraphChangeHistory }> {
+    return this.request<{ history: GraphChangeHistory }>(`/api/chat/history/${graphId}`);
+  }
+
+  async getCausalHistory(graphId: number): Promise<{ tree: CausalHistoryTree }> {
+    return this.request<{ tree: CausalHistoryTree }>(`/api/chat/history/${graphId}/causal`);
+  }
+
+  async getRecommendations(graphId: number, model?: AIModel): Promise<{ recommendations: NextStepRecommendation[] }> {
+    return this.request<{ recommendations: NextStepRecommendation[] }>(`/api/chat/recommendations/${graphId}`, {
+      method: 'POST',
+      body: JSON.stringify({ model }),
+    });
+  }
+
+  // Streaming chat (returns EventSource for SSE)
+  streamChatMessage(request: ChatRequest): EventSource {
+    const params = new URLSearchParams();
+    params.set('message', request.message);
+    params.set('model', request.model || 'claude-sonnet');
+    if (request.graphId) params.set('graphId', request.graphId.toString());
+    if (request.sessionId) params.set('sessionId', request.sessionId);
+
+    // For SSE, we need to POST but use fetch with response.body
+    // Create a custom stream handler
+    return new EventSource(`${API_URL}/api/chat/stream?${params.toString()}`);
   }
 }
 
