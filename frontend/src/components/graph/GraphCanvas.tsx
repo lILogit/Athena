@@ -29,8 +29,9 @@ import {
   getKnowledgeMiningLayout,
   getExplanationLayout,
 } from '../../utils/graphLayout';
-import { OntologyNode, OntologyEdge, NodeType, RelationType } from '@kgs/shared';
+import { OntologyNode, OntologyEdge, NodeType, RelationType, ExtendedNodeType, ExtendedRelationType } from '@kgs/shared';
 import { v4 as uuidv4 } from 'uuid';
+import { api, QuickNodeType, QuickEdgeType } from '../../services/api';
 
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
@@ -49,11 +50,34 @@ export default function GraphCanvas() {
   const [showAddNodeModal, setShowAddNodeModal] = useState(false);
   const [showAddEdgeModal, setShowAddEdgeModal] = useState(false);
   const [newNodeLabel, setNewNodeLabel] = useState('');
-  const [newNodeType, setNewNodeType] = useState<NodeType>('entity');
+  const [newNodeType, setNewNodeType] = useState<ExtendedNodeType>('entity');
   const [newEdgeSource, setNewEdgeSource] = useState('');
   const [newEdgeTarget, setNewEdgeTarget] = useState('');
-  const [newEdgeRelation, setNewEdgeRelation] = useState<RelationType>('influences');
+  const [newEdgeRelation, setNewEdgeRelation] = useState<ExtendedRelationType>('influences');
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+
+  // Archetype-specific type options
+  const [nodeTypeOptions, setNodeTypeOptions] = useState<QuickNodeType[]>([]);
+  const [edgeTypeOptions, setEdgeTypeOptions] = useState<QuickEdgeType[]>([]);
+
+  // Load archetype-specific types when graph changes
+  useEffect(() => {
+    if (currentGraph?.archetype) {
+      api.getNodeTypes(currentGraph.archetype).then(({ nodeTypes }) => {
+        setNodeTypeOptions(nodeTypes);
+        if (nodeTypes.length > 0) {
+          setNewNodeType(nodeTypes[0].type);
+        }
+      }).catch(console.error);
+
+      api.getEdgeTypes(currentGraph.archetype).then(({ edgeTypes }) => {
+        setEdgeTypeOptions(edgeTypes);
+        if (edgeTypes.length > 0) {
+          setNewEdgeRelation(edgeTypes[0].type);
+        }
+      }).catch(console.error);
+    }
+  }, [currentGraph?.archetype]);
 
   // Track the last loaded graph ID to prevent unnecessary resets
   const lastLoadedGraphId = useRef<number | null>(null);
@@ -364,10 +388,15 @@ export default function GraphCanvas() {
   const handleAddNode = useCallback(() => {
     if (!newNodeLabel.trim() || !currentGraph) return;
 
+    // Determine base type and extended type
+    const baseTypes: NodeType[] = ['entity', 'event', 'process', 'attribute'];
+    const isBaseType = baseTypes.includes(newNodeType as NodeType);
+
     const newNode: OntologyNode = {
       id: uuidv4(),
       label: newNodeLabel.trim(),
-      type: newNodeType,
+      type: isBaseType ? (newNodeType as NodeType) : 'entity',
+      extendedType: isBaseType ? undefined : newNodeType,
       properties: {},
       confidence: 1.0,
       source: 'user-stated',
@@ -375,19 +404,29 @@ export default function GraphCanvas() {
 
     addNode(newNode);
     setNewNodeLabel('');
-    setNewNodeType('entity');
+    // Reset to first available type
+    if (nodeTypeOptions.length > 0) {
+      setNewNodeType(nodeTypeOptions[0].type);
+    } else {
+      setNewNodeType('entity');
+    }
     setShowAddNodeModal(false);
-  }, [newNodeLabel, newNodeType, addNode, currentGraph]);
+  }, [newNodeLabel, newNodeType, addNode, currentGraph, nodeTypeOptions]);
 
   // Handle adding a new edge
   const handleAddEdge = useCallback(() => {
     if (!newEdgeSource || !newEdgeTarget || !currentGraph) return;
 
+    // Determine base relation and extended relation
+    const baseRelations: RelationType[] = ['is-a', 'part-of', 'causes', 'enables', 'requires', 'influences'];
+    const isBaseRelation = baseRelations.includes(newEdgeRelation as RelationType);
+
     const newEdge: OntologyEdge = {
       id: uuidv4(),
       source: newEdgeSource,
       target: newEdgeTarget,
-      relation: newEdgeRelation,
+      relation: isBaseRelation ? (newEdgeRelation as RelationType) : 'influences',
+      extendedRelation: isBaseRelation ? undefined : newEdgeRelation,
       strength: 0.8,
       temporal: false,
       properties: {},
@@ -396,9 +435,14 @@ export default function GraphCanvas() {
     addGraphEdge(newEdge);
     setNewEdgeSource('');
     setNewEdgeTarget('');
-    setNewEdgeRelation('influences');
+    // Reset to first available type
+    if (edgeTypeOptions.length > 0) {
+      setNewEdgeRelation(edgeTypeOptions[0].type);
+    } else {
+      setNewEdgeRelation('influences');
+    }
     setShowAddEdgeModal(false);
-  }, [newEdgeSource, newEdgeTarget, newEdgeRelation, addGraphEdge, currentGraph]);
+  }, [newEdgeSource, newEdgeTarget, newEdgeRelation, addGraphEdge, currentGraph, edgeTypeOptions]);
 
   // Handle deleting selected node or edge
   const handleDelete = useCallback(() => {
@@ -873,16 +917,35 @@ export default function GraphCanvas() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select
-                  value={newNodeType}
-                  onChange={(e) => setNewNodeType(e.target.value as NodeType)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="entity">Entity</option>
-                  <option value="event">Event</option>
-                  <option value="process">Process</option>
-                  <option value="attribute">Attribute</option>
-                </select>
+                {nodeTypeOptions.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {nodeTypeOptions.map((option) => (
+                      <button
+                        key={option.type}
+                        onClick={() => setNewNodeType(option.type)}
+                        className={`p-2 rounded-lg border text-left flex items-center gap-2 transition-colors ${
+                          newNodeType === option.type
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <span>{option.icon}</span>
+                        <span className="text-sm">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <select
+                    value={newNodeType}
+                    onChange={(e) => setNewNodeType(e.target.value as ExtendedNodeType)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="entity">Entity</option>
+                    <option value="event">Event</option>
+                    <option value="process">Process</option>
+                    <option value="attribute">Attribute</option>
+                  </select>
+                )}
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
@@ -942,18 +1005,32 @@ export default function GraphCanvas() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Relationship Type</label>
-                <select
-                  value={newEdgeRelation}
-                  onChange={(e) => setNewEdgeRelation(e.target.value as RelationType)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="is-a">is-a (taxonomic)</option>
-                  <option value="part-of">part-of (compositional)</option>
-                  <option value="causes">causes (causal)</option>
-                  <option value="enables">enables (enablement)</option>
-                  <option value="requires">requires (dependency)</option>
-                  <option value="influences">influences (influence)</option>
-                </select>
+                {edgeTypeOptions.length > 0 ? (
+                  <select
+                    value={newEdgeRelation}
+                    onChange={(e) => setNewEdgeRelation(e.target.value as ExtendedRelationType)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {edgeTypeOptions.map((option) => (
+                      <option key={option.type} value={option.type}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={newEdgeRelation}
+                    onChange={(e) => setNewEdgeRelation(e.target.value as ExtendedRelationType)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="is-a">is-a (taxonomic)</option>
+                    <option value="part-of">part-of (compositional)</option>
+                    <option value="causes">causes (causal)</option>
+                    <option value="enables">enables (enablement)</option>
+                    <option value="requires">requires (dependency)</option>
+                    <option value="influences">influences (influence)</option>
+                  </select>
+                )}
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">

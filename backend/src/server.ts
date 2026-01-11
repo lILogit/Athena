@@ -13,6 +13,7 @@ import projectRoutes from './routes/projects';
 import clarifyRoutes from './routes/clarify';
 import ontologyRoutes from './routes/ontology';
 import userRoutes from './routes/users';
+import suggestionRoutes from './routes/suggestions';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -60,6 +61,7 @@ export function createApp(): Express {
   app.use('/api/clarify', clarifyRoutes);
   app.use('/api/ontology', ontologyRoutes);
   app.use('/api/users', userRoutes);
+  app.use('/api/suggestions', suggestionRoutes);
 
   // Error handling
   app.use(notFoundHandler);

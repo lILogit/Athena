@@ -11,7 +11,42 @@ import {
   StartClarificationRequest,
   FinalizeClarificationRequest,
   ConvertTextRequest,
+  GraphArchetype,
+  ExtendedNodeType,
+  ExtendedRelationType,
 } from '@kgs/shared';
+
+// Suggestion types
+export interface NodeSuggestion {
+  label: string;
+  type: ExtendedNodeType;
+  description: string;
+  confidence: number;
+}
+
+export interface EdgeSuggestion {
+  sourceLabel: string;
+  targetLabel: string;
+  relation: ExtendedRelationType;
+  description: string;
+}
+
+export interface ArchetypeSuggestions {
+  nodes: NodeSuggestion[];
+  edges: EdgeSuggestion[];
+  insights: string[];
+}
+
+export interface QuickNodeType {
+  type: ExtendedNodeType;
+  label: string;
+  icon: string;
+}
+
+export interface QuickEdgeType {
+  type: ExtendedRelationType;
+  label: string;
+}
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -153,6 +188,22 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  // Suggestions
+  async getGraphSuggestions(graphId: number, context?: string): Promise<{ suggestions: ArchetypeSuggestions }> {
+    return this.request('/api/suggestions/graph/' + graphId, {
+      method: 'POST',
+      body: JSON.stringify({ context }),
+    });
+  }
+
+  async getNodeTypes(archetype: GraphArchetype): Promise<{ nodeTypes: QuickNodeType[] }> {
+    return this.request(`/api/suggestions/node-types/${archetype}`);
+  }
+
+  async getEdgeTypes(archetype: GraphArchetype): Promise<{ edgeTypes: QuickEdgeType[] }> {
+    return this.request(`/api/suggestions/edge-types/${archetype}`);
   }
 }
 
