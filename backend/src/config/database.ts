@@ -110,11 +110,17 @@ export function initializeDatabase(): void {
   const schemaPath = path.join(__dirname, '../db/schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf-8');
 
+  // Remove comment lines first, then split by semicolon
+  const cleanedSchema = schema
+    .split('\n')
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n');
+
   // Execute schema (split by semicolon and execute each statement)
-  const statements = schema
+  const statements = cleanedSchema
     .split(';')
     .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('--'));
+    .filter(s => s.length > 0);
 
   for (const statement of statements) {
     try {
