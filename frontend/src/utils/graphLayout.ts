@@ -46,12 +46,17 @@ export function getLayoutedElements(nodes: Node[], edges: Edge[], direction = 'T
 
 /**
  * Convert OntologyNode to React Flow Node
+ * Uses stored positions if available, otherwise defaults to grid layout
  */
 export function ontologyNodesToFlow(nodes: OntologyNode[]): Node[] {
-  return nodes.map((node) => ({
+  return nodes.map((node, index) => ({
     id: node.id,
     type: 'custom',
-    position: { x: 0, y: 0 }, // Will be set by layout
+    position: node.position || {
+      // Default grid position if no stored position
+      x: (index % 4) * 250 + 50,
+      y: Math.floor(index / 4) * 150 + 50,
+    },
     data: node,
   }));
 }

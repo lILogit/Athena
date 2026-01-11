@@ -99,27 +99,25 @@ export default function GraphCanvas() {
 
       // Full reset only for new graph or count changes (add/remove)
       if (isNewGraph || nodeCountChanged || edgeCountChanged) {
+        // ontologyNodesToFlow uses stored positions from node.position if available
         const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
         const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
 
-        // Preserve existing positions and selection state
+        // For existing session nodes (same graph, node added/removed), preserve in-memory positions
         const existingNodes = new Map(nodes.map(n => [n.id, n]));
 
-        const nodesWithPositions = flowNodes.map((node, index) => {
+        const nodesWithPositions = flowNodes.map((node) => {
           const existingNode = existingNodes.get(node.id);
-          if (existingNode) {
-            // Preserve position and selection state
+          if (existingNode && !isNewGraph) {
+            // Preserve in-memory position and selection state for existing nodes
             return {
               ...node,
               position: existingNode.position,
               selected: existingNode.selected,
             };
           }
-          // Default grid position for new nodes
-          return {
-            ...node,
-            position: { x: (index % 4) * 250 + 50, y: Math.floor(index / 4) * 150 + 50 },
-          };
+          // Use the position from ontologyNodesToFlow (either stored or default grid)
+          return node;
         });
 
         setNodes(nodesWithPositions);
@@ -572,13 +570,17 @@ export default function GraphCanvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleDelete, undo, redo]);
 
-  // Save graph when nodes/edges change
+  // Save graph when nodes/edges change (includes positions)
   useEffect(() => {
     if (currentGraph && nodes.length > 0) {
       // Debounce save to avoid too many updates
       const timeoutId = setTimeout(() => {
         const updatedOntologyData = {
-          nodes: nodes.map((node) => node.data),
+          // Include current positions in node data for persistence
+          nodes: nodes.map((node) => ({
+            ...node.data,
+            position: node.position, // Persist the current position
+          })),
           edges: edges.map((edge) => edge.data),
         };
         updateGraph(currentGraph.id, updatedOntologyData);

@@ -104,6 +104,11 @@ export interface ArchetypeConfig {
   };
 }
 
+export interface NodePosition {
+  x: number;
+  y: number;
+}
+
 export interface OntologyNode {
   id: string;
   label: string;
@@ -113,6 +118,7 @@ export interface OntologyNode {
   confidence: number; // 0-1
   source: SourceType;
   archetypeMetadata?: ArchetypeNodeMetadata;
+  position?: NodePosition; // Persisted node position for layout restoration
 }
 
 export interface OntologyEdge {
