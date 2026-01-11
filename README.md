@@ -1,4 +1,4 @@
-# Knowledge Graph System
+# Interactive Knowledge Graph System
 
 A Human-in-the-Loop conversational AI system that transforms thoughts into structured knowledge graphs through iterative dialogue, visual editing, and pattern recognition.
 
