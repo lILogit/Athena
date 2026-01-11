@@ -431,6 +431,21 @@ const useGraphStore = create<GraphState>((set, get) => ({
           showExamples: true,
         },
       },
+      'goal-achievement': {
+        archetype: 'goal-achievement',
+        layoutPreferences: { algorithm: 'hierarchical' },
+        displayOptions: {},
+      },
+      decision: {
+        archetype: 'decision',
+        layoutPreferences: { algorithm: 'radial' },
+        displayOptions: {},
+      },
+      prediction: {
+        archetype: 'prediction',
+        layoutPreferences: { algorithm: 'timeline' },
+        displayOptions: {},
+      },
     };
 
     const newConfig = defaultConfigs[archetype];

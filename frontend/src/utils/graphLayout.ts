@@ -371,3 +371,332 @@ export function getExplanationLayout(
 
   return { nodes: layoutedNodes, edges };
 }
+
+/**
+ * Goal Achievement Layout - Hierarchical with goal at top
+ * Flows from goal -> milestones -> actions, with obstacles and resources positioned to the side
+ */
+export function getGoalAchievementLayout(
+  nodes: Node[],
+  edges: Edge[],
+  options: {
+    goalNodeId?: string;
+    showDependencies?: boolean;
+  } = {}
+): { nodes: Node[]; edges: Edge[] } {
+  if (nodes.length === 0) return { nodes, edges };
+
+  // Find the goal node
+  let goalNodeId = options.goalNodeId;
+  if (!goalNodeId) {
+    const goalNode = nodes.find((n) => n.data?.extendedType === 'goal');
+    goalNodeId = goalNode?.id || nodes[0]?.id;
+  }
+
+  // Categorize nodes by type
+  const nodeCategories = new Map<string, Node[]>();
+  const categoryOrder = ['goal', 'milestone', 'action', 'resource', 'obstacle'];
+
+  categoryOrder.forEach((cat) => nodeCategories.set(cat, []));
+  nodeCategories.set('other', []);
+
+  nodes.forEach((node) => {
+    const extType = node.data?.extendedType || 'other';
+    if (nodeCategories.has(extType)) {
+      nodeCategories.get(extType)!.push(node);
+    } else {
+      nodeCategories.get('other')!.push(node);
+    }
+  });
+
+  // Position nodes
+  const centerX = 400;
+  const positions = new Map<string, { x: number; y: number }>();
+
+  // Goals at top
+  const goals = nodeCategories.get('goal') || [];
+  goals.forEach((node, i) => {
+    const totalWidth = (goals.length - 1) * (NODE_WIDTH + 50);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 50),
+      y: 50,
+    });
+  });
+
+  // Milestones below goals
+  const milestones = nodeCategories.get('milestone') || [];
+  milestones.forEach((node, i) => {
+    const totalWidth = (milestones.length - 1) * (NODE_WIDTH + 40);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 40),
+      y: 180,
+    });
+  });
+
+  // Actions in the middle
+  const actions = nodeCategories.get('action') || [];
+  actions.forEach((node, i) => {
+    const totalWidth = (actions.length - 1) * (NODE_WIDTH + 30);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 30),
+      y: 310,
+    });
+  });
+
+  // Resources on the left side
+  const resources = nodeCategories.get('resource') || [];
+  resources.forEach((node, i) => {
+    positions.set(node.id, {
+      x: 50,
+      y: 180 + i * (NODE_HEIGHT + 30),
+    });
+  });
+
+  // Obstacles on the right side (highlighted as blockers)
+  const obstacles = nodeCategories.get('obstacle') || [];
+  obstacles.forEach((node, i) => {
+    positions.set(node.id, {
+      x: centerX + 350,
+      y: 180 + i * (NODE_HEIGHT + 30),
+    });
+  });
+
+  // Other nodes at bottom
+  const others = nodeCategories.get('other') || [];
+  others.forEach((node, i) => {
+    const totalWidth = (others.length - 1) * (NODE_WIDTH + 30);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 30),
+      y: 440,
+    });
+  });
+
+  const layoutedNodes = nodes.map((node) => ({
+    ...node,
+    position: positions.get(node.id) || node.position,
+  }));
+
+  return { nodes: layoutedNodes, edges };
+}
+
+/**
+ * Decision Layout - Decision point at center with options radiating out
+ * Criteria connected to options, outcomes at the periphery
+ */
+export function getDecisionLayout(
+  nodes: Node[],
+  edges: Edge[],
+  options: {
+    decisionNodeId?: string;
+    weightedPositioning?: boolean;
+  } = {}
+): { nodes: Node[]; edges: Edge[] } {
+  if (nodes.length === 0) return { nodes, edges };
+
+  // Find the decision point node
+  let decisionNodeId = options.decisionNodeId;
+  if (!decisionNodeId) {
+    const decisionNode = nodes.find((n) => n.data?.extendedType === 'decision-point');
+    decisionNodeId = decisionNode?.id || nodes[0]?.id;
+  }
+
+  // Categorize nodes
+  const nodeCategories = new Map<string, Node[]>();
+  const categoryTypes = ['decision-point', 'option', 'criterion', 'outcome', 'risk'];
+  categoryTypes.forEach((cat) => nodeCategories.set(cat, []));
+  nodeCategories.set('other', []);
+
+  nodes.forEach((node) => {
+    const extType = node.data?.extendedType || 'other';
+    if (nodeCategories.has(extType)) {
+      nodeCategories.get(extType)!.push(node);
+    } else {
+      nodeCategories.get('other')!.push(node);
+    }
+  });
+
+  const centerX = 400;
+  const centerY = 300;
+  const positions = new Map<string, { x: number; y: number }>();
+
+  // Decision point at center
+  const decisionPoints = nodeCategories.get('decision-point') || [];
+  decisionPoints.forEach((node, i) => {
+    if (i === 0) {
+      positions.set(node.id, { x: centerX, y: centerY });
+    } else {
+      // Multiple decision points spread vertically
+      positions.set(node.id, { x: centerX, y: centerY + i * 200 });
+    }
+  });
+
+  // Options radiate from center
+  const optionNodes = nodeCategories.get('option') || [];
+  const optionRadius = 200;
+  optionNodes.forEach((node, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(optionNodes.length, 1) - Math.PI / 2;
+    positions.set(node.id, {
+      x: centerX + optionRadius * Math.cos(angle),
+      y: centerY + optionRadius * Math.sin(angle),
+    });
+  });
+
+  // Criteria at top (influence all options)
+  const criteria = nodeCategories.get('criterion') || [];
+  criteria.forEach((node, i) => {
+    const totalWidth = (criteria.length - 1) * (NODE_WIDTH + 20);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 20),
+      y: 50,
+    });
+  });
+
+  // Outcomes at outer ring (beyond options)
+  const outcomes = nodeCategories.get('outcome') || [];
+  const outcomeRadius = 380;
+  outcomes.forEach((node, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(outcomes.length, 1);
+    positions.set(node.id, {
+      x: centerX + outcomeRadius * Math.cos(angle),
+      y: centerY + outcomeRadius * Math.sin(angle),
+    });
+  });
+
+  // Risks near the bottom (warning indicators)
+  const risks = nodeCategories.get('risk') || [];
+  risks.forEach((node, i) => {
+    const totalWidth = (risks.length - 1) * (NODE_WIDTH + 20);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 20),
+      y: centerY + 320,
+    });
+  });
+
+  // Other nodes at bottom
+  const others = nodeCategories.get('other') || [];
+  others.forEach((node, i) => {
+    const totalWidth = (others.length - 1) * (NODE_WIDTH + 20);
+    positions.set(node.id, {
+      x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 20),
+      y: centerY + 420,
+    });
+  });
+
+  const layoutedNodes = nodes.map((node) => ({
+    ...node,
+    position: positions.get(node.id) || node.position,
+  }));
+
+  return { nodes: layoutedNodes, edges };
+}
+
+/**
+ * Prediction Layout - Timeline-based with trends and forecasts
+ * Signals/assumptions on left, trends in middle, scenarios/forecasts on right
+ */
+export function getPredictionLayout(
+  nodes: Node[],
+  edges: Edge[],
+  options: {
+    timelineOrientation?: 'horizontal' | 'vertical';
+    groupByCategory?: boolean;
+  } = {}
+): { nodes: Node[]; edges: Edge[] } {
+  const { timelineOrientation = 'horizontal' } = options;
+
+  if (nodes.length === 0) return { nodes, edges };
+
+  // Categorize nodes by type
+  const nodeCategories = new Map<string, Node[]>();
+  const categoryTypes = ['assumption', 'signal', 'trend', 'scenario', 'forecast'];
+  categoryTypes.forEach((cat) => nodeCategories.set(cat, []));
+  nodeCategories.set('other', []);
+
+  nodes.forEach((node) => {
+    const extType = node.data?.extendedType || 'other';
+    if (nodeCategories.has(extType)) {
+      nodeCategories.get(extType)!.push(node);
+    } else {
+      nodeCategories.get('other')!.push(node);
+    }
+  });
+
+  const positions = new Map<string, { x: number; y: number }>();
+  const startX = 50;
+  const startY = 100;
+  const columnSpacing = NODE_WIDTH + 80;
+  const rowSpacing = NODE_HEIGHT + 40;
+
+  if (timelineOrientation === 'horizontal') {
+    // Left to right: Assumptions -> Signals -> Trends -> Scenarios -> Forecasts
+    const columns = [
+      { type: 'assumption', x: startX },
+      { type: 'signal', x: startX + columnSpacing },
+      { type: 'trend', x: startX + columnSpacing * 2 },
+      { type: 'scenario', x: startX + columnSpacing * 3 },
+      { type: 'forecast', x: startX + columnSpacing * 4 },
+    ];
+
+    columns.forEach(({ type, x }) => {
+      const typeNodes = nodeCategories.get(type) || [];
+      typeNodes.forEach((node, i) => {
+        positions.set(node.id, {
+          x: x,
+          y: startY + i * rowSpacing,
+        });
+      });
+    });
+
+    // Other nodes at bottom
+    const others = nodeCategories.get('other') || [];
+    const maxRows = Math.max(
+      ...categoryTypes.map((t) => (nodeCategories.get(t) || []).length),
+      1
+    );
+    others.forEach((node, i) => {
+      positions.set(node.id, {
+        x: startX + (i % 5) * columnSpacing,
+        y: startY + maxRows * rowSpacing + 50,
+      });
+    });
+  } else {
+    // Top to bottom: Assumptions at top, Forecasts at bottom
+    const rows = [
+      { type: 'assumption', y: startY },
+      { type: 'signal', y: startY + rowSpacing * 2 },
+      { type: 'trend', y: startY + rowSpacing * 4 },
+      { type: 'scenario', y: startY + rowSpacing * 6 },
+      { type: 'forecast', y: startY + rowSpacing * 8 },
+    ];
+
+    rows.forEach(({ type, y }) => {
+      const typeNodes = nodeCategories.get(type) || [];
+      const totalWidth = (typeNodes.length - 1) * (NODE_WIDTH + 30);
+      const centerX = 400;
+      typeNodes.forEach((node, i) => {
+        positions.set(node.id, {
+          x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 30),
+          y: y,
+        });
+      });
+    });
+
+    // Other nodes at bottom
+    const others = nodeCategories.get('other') || [];
+    const centerX = 400;
+    const totalWidth = (others.length - 1) * (NODE_WIDTH + 30);
+    others.forEach((node, i) => {
+      positions.set(node.id, {
+        x: centerX - totalWidth / 2 + i * (NODE_WIDTH + 30),
+        y: startY + rowSpacing * 10,
+      });
+    });
+  }
+
+  const layoutedNodes = nodes.map((node) => ({
+    ...node,
+    position: positions.get(node.id) || node.position,
+  }));
+
+  return { nodes: layoutedNodes, edges };
+}

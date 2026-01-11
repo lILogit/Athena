@@ -111,12 +111,19 @@ export default function Sidebar() {
                     {graph.archetype && graph.archetype !== 'general' && (
                       <span
                         className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
-                          graph.archetype === 'knowledge-mining'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-amber-100 text-amber-700'
+                          graph.archetype === 'knowledge-mining' ? 'bg-purple-100 text-purple-700' :
+                          graph.archetype === 'explanation' ? 'bg-amber-100 text-amber-700' :
+                          graph.archetype === 'goal-achievement' ? 'bg-green-100 text-green-700' :
+                          graph.archetype === 'decision' ? 'bg-blue-100 text-blue-700' :
+                          graph.archetype === 'prediction' ? 'bg-indigo-100 text-indigo-700' :
+                          'bg-gray-100 text-gray-700'
                         }`}
                       >
-                        {graph.archetype === 'knowledge-mining' ? '🔍' : '💡'}
+                        {graph.archetype === 'knowledge-mining' ? '🔍' :
+                         graph.archetype === 'explanation' ? '💡' :
+                         graph.archetype === 'goal-achievement' ? '🎯' :
+                         graph.archetype === 'decision' ? '⚖️' :
+                         graph.archetype === 'prediction' ? '🔮' : '📊'}
                       </span>
                     )}
                   </div>

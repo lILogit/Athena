@@ -7,13 +7,33 @@ export type RelationType = 'is-a' | 'part-of' | 'causes' | 'enables' | 'requires
 export type SourceType = 'user-stated' | 'inferred';
 
 // Graph Archetype types
-export type GraphArchetype = 'general' | 'knowledge-mining' | 'explanation';
+export type GraphArchetype = 'general' | 'knowledge-mining' | 'explanation' | 'goal-achievement' | 'decision' | 'prediction';
 
 // Extended node types for specific archetypes
-export type ExtendedNodeType = NodeType | 'cluster' | 'pattern' | 'mechanism' | 'example' | 'analogy' | 'prerequisite';
+export type ExtendedNodeType = NodeType |
+  // Knowledge Mining
+  'cluster' | 'pattern' |
+  // Explanation
+  'mechanism' | 'example' | 'analogy' | 'prerequisite' |
+  // Goal Achievement
+  'goal' | 'milestone' | 'obstacle' | 'resource' | 'action' |
+  // Decision
+  'decision-point' | 'option' | 'criterion' | 'outcome' | 'risk' |
+  // Prediction
+  'trend' | 'signal' | 'scenario' | 'assumption' | 'forecast';
 
 // Extended relation types for specific archetypes
-export type ExtendedRelationType = RelationType | 'similar-to' | 'clusters-with' | 'explains' | 'exemplifies' | 'analogous-to' | 'prerequisite-for';
+export type ExtendedRelationType = RelationType |
+  // Knowledge Mining
+  'similar-to' | 'clusters-with' |
+  // Explanation
+  'explains' | 'exemplifies' | 'analogous-to' | 'prerequisite-for' |
+  // Goal Achievement
+  'achieves' | 'blocks' | 'depends-on' | 'milestone-of' | 'requires-resource' |
+  // Decision
+  'leads-to' | 'evaluates' | 'mitigates' | 'conflicts-with' | 'supports' |
+  // Prediction
+  'predicts' | 'indicates' | 'assumes' | 'impacts' | 'derives-from';
 
 // Archetype-specific metadata for nodes
 export interface ArchetypeNodeMetadata {
@@ -25,6 +45,21 @@ export interface ArchetypeNodeMetadata {
   // Explanation specific
   explanationLayer?: number; // 0 = central phenomenon, 1 = direct causes, etc.
   complexityLevel?: number; // 1-5, used for complexity slider filtering
+
+  // Goal Achievement specific
+  priority?: 'high' | 'medium' | 'low';
+  status?: 'not-started' | 'in-progress' | 'completed' | 'blocked';
+  deadline?: string;
+
+  // Decision specific
+  weight?: number; // For criteria weighting
+  probability?: number; // 0-1, for outcome likelihood
+  impact?: 'positive' | 'negative' | 'neutral';
+
+  // Prediction specific
+  confidence?: number; // 0-1, prediction confidence
+  timeframe?: string; // e.g., "Q1 2025", "short-term"
+  category?: string; // e.g., "market", "technology", "social"
 }
 
 // Archetype-specific metadata for edges
@@ -35,6 +70,15 @@ export interface ArchetypeEdgeMetadata {
 
   // Explanation specific
   explanationType?: 'causal' | 'compositional' | 'analogical';
+
+  // Goal Achievement specific
+  progressContribution?: number; // 0-1, how much this edge contributes to progress
+
+  // Decision specific
+  score?: number; // For weighted decision edges
+
+  // Prediction specific
+  likelihood?: number; // 0-1, how likely this relationship holds
 }
 
 // Layout preferences per archetype

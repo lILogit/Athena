@@ -51,6 +51,51 @@ Focus on:
 - Concrete examples that clarify abstract concepts
 - Helpful analogies for complex ideas
 - Prerequisites needed to understand the topic`,
+
+  'goal-achievement': `You are helping build a Goal Achievement graph focused on planning and tracking progress toward objectives.
+Suggest nodes using these extended types:
+- goal: Main objective to achieve
+- milestone: Key checkpoint toward the goal
+- action: Specific step or task to perform
+- resource: Asset, skill, or tool needed
+- obstacle: Barrier or challenge to overcome
+
+Focus on:
+- Breaking down goals into achievable milestones
+- Identifying concrete actions required
+- Resources needed for success
+- Potential obstacles and how to address them
+- Dependencies between milestones and actions`,
+
+  decision: `You are helping build a Decision graph focused on analyzing choices and their consequences.
+Suggest nodes using these extended types:
+- decision-point: The choice or question to be decided
+- option: A possible choice or alternative
+- criterion: A factor to consider when evaluating options
+- outcome: A potential result of choosing an option
+- risk: A potential negative consequence or uncertainty
+
+Focus on:
+- Clarifying the decision to be made
+- Identifying all viable options
+- Criteria for evaluation (cost, time, impact, etc.)
+- Likely outcomes for each option
+- Associated risks and how to mitigate them`,
+
+  prediction: `You are helping build a Prediction graph focused on forecasting future scenarios.
+Suggest nodes using these extended types:
+- trend: An observed pattern or direction
+- signal: An indicator or early warning sign
+- scenario: A possible future state
+- assumption: An underlying belief or premise
+- forecast: A specific prediction about the future
+
+Focus on:
+- Current trends that may continue
+- Signals that indicate change
+- Multiple scenarios (best case, worst case, likely)
+- Key assumptions and their validity
+- Confidence levels for predictions`,
 };
 
 class SuggestionService {
@@ -142,6 +187,30 @@ Respond in this exact JSON format:
           { type: 'analogy', label: 'Analogy', icon: '💡' },
           { type: 'prerequisite', label: 'Prerequisite', icon: '🔒' },
         ];
+      case 'goal-achievement':
+        return [
+          { type: 'goal', label: 'Goal', icon: '🎯' },
+          { type: 'milestone', label: 'Milestone', icon: '🏁' },
+          { type: 'action', label: 'Action', icon: '▶️' },
+          { type: 'resource', label: 'Resource', icon: '🔧' },
+          { type: 'obstacle', label: 'Obstacle', icon: '🚧' },
+        ];
+      case 'decision':
+        return [
+          { type: 'decision-point', label: 'Decision Point', icon: '⚖️' },
+          { type: 'option', label: 'Option', icon: '🔘' },
+          { type: 'criterion', label: 'Criterion', icon: '📋' },
+          { type: 'outcome', label: 'Outcome', icon: '🎁' },
+          { type: 'risk', label: 'Risk', icon: '⚠️' },
+        ];
+      case 'prediction':
+        return [
+          { type: 'trend', label: 'Trend', icon: '📈' },
+          { type: 'signal', label: 'Signal', icon: '📡' },
+          { type: 'scenario', label: 'Scenario', icon: '🎬' },
+          { type: 'assumption', label: 'Assumption', icon: '💭' },
+          { type: 'forecast', label: 'Forecast', icon: '🔮' },
+        ];
       default:
         return [
           { type: 'entity', label: 'Entity', icon: '📦' },
@@ -173,6 +242,31 @@ Respond in this exact JSON format:
           { type: 'analogous-to', label: 'Analogous To' },
           { type: 'prerequisite-for', label: 'Prerequisite For' },
           { type: 'enables', label: 'Enables' },
+        ];
+      case 'goal-achievement':
+        return [
+          { type: 'achieves', label: 'Achieves' },
+          { type: 'blocks', label: 'Blocks' },
+          { type: 'depends-on', label: 'Depends On' },
+          { type: 'milestone-of', label: 'Milestone Of' },
+          { type: 'requires-resource', label: 'Requires Resource' },
+          { type: 'enables', label: 'Enables' },
+        ];
+      case 'decision':
+        return [
+          { type: 'leads-to', label: 'Leads To' },
+          { type: 'evaluates', label: 'Evaluates' },
+          { type: 'mitigates', label: 'Mitigates' },
+          { type: 'conflicts-with', label: 'Conflicts With' },
+          { type: 'supports', label: 'Supports' },
+        ];
+      case 'prediction':
+        return [
+          { type: 'predicts', label: 'Predicts' },
+          { type: 'indicates', label: 'Indicates' },
+          { type: 'assumes', label: 'Assumes' },
+          { type: 'impacts', label: 'Impacts' },
+          { type: 'derives-from', label: 'Derives From' },
         ];
       default:
         return [

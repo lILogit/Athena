@@ -20,6 +20,7 @@ import 'reactflow/dist/style.css';
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
 import ComplexitySlider from './ComplexitySlider';
+import ArchetypeHelpPanel from './ArchetypeHelpPanel';
 import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
 import {
@@ -28,6 +29,9 @@ import {
   ontologyEdgesToFlow,
   getKnowledgeMiningLayout,
   getExplanationLayout,
+  getGoalAchievementLayout,
+  getDecisionLayout,
+  getPredictionLayout,
 } from '../../utils/graphLayout';
 import { OntologyNode, OntologyEdge, NodeType, RelationType, ExtendedNodeType, ExtendedRelationType } from '@kgs/shared';
 import { v4 as uuidv4 } from 'uuid';
@@ -301,6 +305,24 @@ export default function GraphCanvas() {
         // Explanation layout: concentric circles by layer
         const expResult = getExplanationLayout(nodes, edges);
         layoutedNodes = expResult.nodes;
+        break;
+      }
+      case 'goal-achievement': {
+        // Goal Achievement layout: hierarchical from goal down
+        const gaResult = getGoalAchievementLayout(nodes, edges);
+        layoutedNodes = gaResult.nodes;
+        break;
+      }
+      case 'decision': {
+        // Decision layout: central decision point with radiating options
+        const decResult = getDecisionLayout(nodes, edges);
+        layoutedNodes = decResult.nodes;
+        break;
+      }
+      case 'prediction': {
+        // Prediction layout: timeline-based
+        const predResult = getPredictionLayout(nodes, edges);
+        layoutedNodes = predResult.nodes;
         break;
       }
       default:
@@ -643,18 +665,36 @@ export default function GraphCanvas() {
           </Panel>
         )}
 
+        {/* Archetype Help Panel */}
+        {currentGraph?.archetype && (
+          <Panel position="bottom-right" className="mr-2 mb-4">
+            <ArchetypeHelpPanel archetype={currentGraph.archetype} />
+          </Panel>
+        )}
+
         {/* Archetype badge */}
         {currentGraph?.archetype && currentGraph.archetype !== 'general' && (
           <Panel position="top-left" className="ml-12">
             <div className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${
-              currentGraph.archetype === 'knowledge-mining'
-                ? 'bg-purple-100 text-purple-800'
-                : 'bg-amber-100 text-amber-800'
+              currentGraph.archetype === 'knowledge-mining' ? 'bg-purple-100 text-purple-800' :
+              currentGraph.archetype === 'explanation' ? 'bg-amber-100 text-amber-800' :
+              currentGraph.archetype === 'goal-achievement' ? 'bg-green-100 text-green-800' :
+              currentGraph.archetype === 'decision' ? 'bg-blue-100 text-blue-800' :
+              currentGraph.archetype === 'prediction' ? 'bg-indigo-100 text-indigo-800' :
+              'bg-gray-100 text-gray-800'
             }`}>
               <span>
-                {currentGraph.archetype === 'knowledge-mining' ? '🔍' : '💡'}
+                {currentGraph.archetype === 'knowledge-mining' ? '🔍' :
+                 currentGraph.archetype === 'explanation' ? '💡' :
+                 currentGraph.archetype === 'goal-achievement' ? '🎯' :
+                 currentGraph.archetype === 'decision' ? '⚖️' :
+                 currentGraph.archetype === 'prediction' ? '🔮' : '📊'}
               </span>
-              {currentGraph.archetype === 'knowledge-mining' ? 'Knowledge Mining' : 'Explanation'}
+              {currentGraph.archetype === 'knowledge-mining' ? 'Knowledge Mining' :
+               currentGraph.archetype === 'explanation' ? 'Explanation' :
+               currentGraph.archetype === 'goal-achievement' ? 'Goal Achievement' :
+               currentGraph.archetype === 'decision' ? 'Decision' :
+               currentGraph.archetype === 'prediction' ? 'Prediction' : currentGraph.archetype}
             </div>
           </Panel>
         )}
@@ -839,6 +879,33 @@ export default function GraphCanvas() {
                       >
                         <span className="w-4 h-4 text-center">💡</span>
                         Explanation (Concentric)
+                      </button>
+                    )}
+                    {currentGraph.archetype === 'goal-achievement' && (
+                      <button
+                        onClick={() => applyLayout('goal-achievement')}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="w-4 h-4 text-center">🎯</span>
+                        Goal Hierarchy
+                      </button>
+                    )}
+                    {currentGraph.archetype === 'decision' && (
+                      <button
+                        onClick={() => applyLayout('decision')}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="w-4 h-4 text-center">⚖️</span>
+                        Decision Radial
+                      </button>
+                    )}
+                    {currentGraph.archetype === 'prediction' && (
+                      <button
+                        onClick={() => applyLayout('prediction')}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="w-4 h-4 text-center">🔮</span>
+                        Prediction Timeline
                       </button>
                     )}
                   </>

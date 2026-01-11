@@ -45,7 +45,7 @@ export class SuggestionController {
     try {
       const archetype = req.params.archetype as GraphArchetype;
 
-      if (!['general', 'knowledge-mining', 'explanation'].includes(archetype)) {
+      if (!['general', 'knowledge-mining', 'explanation', 'goal-achievement', 'decision', 'prediction'].includes(archetype)) {
         throw new AppError(400, 'INVALID_ARCHETYPE', 'Invalid archetype');
       }
 
@@ -69,7 +69,7 @@ export class SuggestionController {
     try {
       const archetype = req.params.archetype as GraphArchetype;
 
-      if (!['general', 'knowledge-mining', 'explanation'].includes(archetype)) {
+      if (!['general', 'knowledge-mining', 'explanation', 'goal-achievement', 'decision', 'prediction'].includes(archetype)) {
         throw new AppError(400, 'INVALID_ARCHETYPE', 'Invalid archetype');
       }
 
