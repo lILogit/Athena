@@ -11,7 +11,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-5-20250929}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - SQLITE_DB_PATH=/app/data/kgs.db
     volumes:
