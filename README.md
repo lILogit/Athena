@@ -7,6 +7,7 @@
   />
 </div>
 
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/51a94fc4-d4bc-4662-ae3a-18637f396786" />
 
 
 # Interactive Knowledge Graph System
