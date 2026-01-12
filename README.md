@@ -9,7 +9,7 @@
 
 
 
-# Interactive Knowledge Graph System
+#  Advanced Thinking for Hyperconnected Entity Networks & Analytics
 
 A Human-in-the-Loop conversational AI system that transforms thoughts into structured knowledge graphs through iterative dialogue, visual editing, and pattern recognition.
 
