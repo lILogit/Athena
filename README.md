@@ -3,11 +3,10 @@
     width="300"
     height="300"
     alt="image"
-    src="https://github.com/user-attachments/assets/096fdf5c-69b6-4bff-a6c9-e5272cf64153](https://github.com/user-attachments/assets/0bcef673-df2f-4898-976f-8d1a82372ecc"
+    src="https://github.com/user-attachments/assets/51a94fc4-d4bc-4662-ae3a-18637f396786"
   />
 </div>
 
-<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/51a94fc4-d4bc-4662-ae3a-18637f396786" />
 
 
 # Interactive Knowledge Graph System
