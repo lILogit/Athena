@@ -5,7 +5,8 @@ import { Message, ExtractedEntity } from '@kgs/shared';
 import { api } from '../../services/api';
 import ArchetypeSelector from './ArchetypeSelector';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// In production, use relative URLs since frontend is served by backend
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3000');
 
 export default function ClarificationDialog() {
   const { clarificationDialogOpen, closeClarificationDialog, enrichmentMode, archetypeSelectionPhase, selectedArchetype } = useUI();

@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import path from 'path';
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { corsMiddleware } from './middleware/cors';
@@ -64,6 +65,22 @@ export function createApp(): Express {
   app.use('/api/users', userRoutes);
   app.use('/api/suggestions', suggestionRoutes);
   app.use('/api/chat', chatRoutes);
+
+  // Serve frontend static files in production
+  if (process.env.NODE_ENV === 'production') {
+    const frontendPath = path.join(__dirname, '../../frontend/dist');
+
+    // Serve static files
+    app.use(express.static(frontendPath));
+
+    // SPA fallback - serve index.html for non-API routes
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        return next();
+      }
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+  }
 
   // Error handling
   app.use(notFoundHandler);

@@ -55,7 +55,9 @@ export interface QuickEdgeType {
   label: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// In production, use relative URLs (empty string) since frontend is served by backend
+// In development, default to localhost:3000
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3000');
 
 class ApiService {
   private async request<T>(
