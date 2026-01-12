@@ -1,3 +1,6 @@
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/f5abe8cc-b989-4084-b631-ba3c55cff4a6" />
+
+
 # Interactive Knowledge Graph System
 
 A Human-in-the-Loop conversational AI system that transforms thoughts into structured knowledge graphs through iterative dialogue, visual editing, and pattern recognition.
