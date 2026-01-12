@@ -1,4 +1,5 @@
-<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/f5abe8cc-b989-4084-b631-ba3c55cff4a6" />
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/096fdf5c-69b6-4bff-a6c9-e5272cf64153" />
+
 
 
 # Interactive Knowledge Graph System
