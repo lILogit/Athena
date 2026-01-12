@@ -25,8 +25,17 @@ export function createApp(): Express {
   // Initialize database
   initializeDatabase();
 
+  // Serve frontend static files in production (BEFORE other middleware - no CORS needed)
+  let frontendPath: string | undefined;
+  if (process.env.NODE_ENV === 'production') {
+    frontendPath = path.join(__dirname, '../../frontend/dist');
+    app.use(express.static(frontendPath));
+  }
+
+  // Apply CORS only to API routes
+  app.use('/api', corsMiddleware);
+
   // Middleware
-  app.use(corsMiddleware);
   app.use(express.json({ limit: '10mb' })); // Support large graph data
   app.use(express.urlencoded({ extended: true }));
 
@@ -66,14 +75,8 @@ export function createApp(): Express {
   app.use('/api/suggestions', suggestionRoutes);
   app.use('/api/chat', chatRoutes);
 
-  // Serve frontend static files in production
-  if (process.env.NODE_ENV === 'production') {
-    const frontendPath = path.join(__dirname, '../../frontend/dist');
-
-    // Serve static files
-    app.use(express.static(frontendPath));
-
-    // SPA fallback - serve index.html for non-API routes
+  // SPA fallback - serve index.html for non-API routes (production only)
+  if (process.env.NODE_ENV === 'production' && frontendPath) {
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api/')) {
         return next();
