@@ -8,12 +8,17 @@ export const corsOptions = {
     if (!origin) {
       return callback(null, true);
     }
+    // In production, frontend is served from same origin - allow all origins
+    // (Browser sends Origin header even for same-origin fetch in some cases)
+    if (process.env.NODE_ENV === 'production') {
+      return callback(null, true);
+    }
     // Allow configured frontend URL
     if (origin === FRONTEND_URL) {
       return callback(null, true);
     }
     // In development, allow localhost
-    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+    if (origin.includes('localhost')) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
