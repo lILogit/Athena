@@ -14,6 +14,9 @@ interface UIState {
   enrichmentMode: boolean;
   enrichGraphId: number | null;
 
+  // Selected project for creating graphs
+  selectedProjectId: number | null;
+
   // Archetype selection
   selectedArchetype: GraphArchetype;
   archetypeSelectionPhase: boolean; // Show archetype selector before clarification
@@ -26,9 +29,10 @@ interface UIState {
   toggleSidebar: () => void;
   toggleContextPanel: () => void;
   toggleClarificationDialog: () => void;
-  openClarificationDialog: () => void;
+  openClarificationDialog: (projectId: number) => void;
   openEnrichmentDialog: (graphId: number) => void;
   closeClarificationDialog: () => void;
+  setSelectedProjectId: (projectId: number) => void;
   selectNode: (nodeId: string | null) => void;
   selectNodes: (nodeIds: string[]) => void; // Multi-select
   selectEdge: (edgeId: string | null) => void;
@@ -52,6 +56,7 @@ const useUIStore = create<UIState>((set) => ({
   selectedEdgeId: null,
   enrichmentMode: false,
   enrichGraphId: null,
+  selectedProjectId: null,
   selectedArchetype: 'general',
   archetypeSelectionPhase: true,
   chatWindowOpen: false,
@@ -61,10 +66,11 @@ const useUIStore = create<UIState>((set) => ({
   toggleContextPanel: () => set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
   toggleClarificationDialog: () =>
     set((state) => ({ clarificationDialogOpen: !state.clarificationDialogOpen })),
-  openClarificationDialog: () => set({
+  openClarificationDialog: (projectId: number) => set({
     clarificationDialogOpen: true,
     enrichmentMode: false,
     enrichGraphId: null,
+    selectedProjectId: projectId,
     archetypeSelectionPhase: true,
     selectedArchetype: 'general',
   }),
@@ -81,6 +87,7 @@ const useUIStore = create<UIState>((set) => ({
     archetypeSelectionPhase: true,
     selectedArchetype: 'general',
   }),
+  setSelectedProjectId: (projectId: number) => set({ selectedProjectId: projectId }),
   selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedNodeIds: nodeId ? [nodeId] : [], selectedEdgeId: null }),
   selectNodes: (nodeIds) => set({ selectedNodeIds: nodeIds, selectedNodeId: nodeIds.length === 1 ? nodeIds[0] : null, selectedEdgeId: null }),
   selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null, selectedNodeIds: [] }),

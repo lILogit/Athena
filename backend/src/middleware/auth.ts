@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 
 // Extend Express Request to include user
 declare global {
@@ -14,28 +17,46 @@ declare global {
   }
 }
 
+interface JwtPayload {
+  id: number;
+  email: string;
+  name: string;
+}
+
 /**
- * Mock authentication middleware for Phase 1
- * Always authenticates as demo user (id=1)
- * In Phase 2, replace with JWT authentication
+ * Authentication middleware - verifies JWT token from Authorization header
+ * Sets req.user if valid token is present, otherwise leaves it undefined
  */
 export function authenticateUser(
   req: Request,
   res: Response,
   next: NextFunction
 ): void {
-  // Mock authentication - always set user to demo user
-  req.user = {
-    id: 1,
-    email: 'demo@local',
-    name: 'Demo User',
-  };
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // No token provided - continue without user
+    return next();
+  }
+
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      name: decoded.name,
+    };
+  } catch (error) {
+    // Invalid token - continue without user
+  }
 
   next();
 }
 
 /**
- * Require authenticated user
+ * Require authenticated user - throws 401 if no valid user
  */
 export function requireAuth(
   req: Request,

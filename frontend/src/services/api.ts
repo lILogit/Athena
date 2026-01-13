@@ -60,6 +60,11 @@ export interface QuickEdgeType {
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3000');
 
 class ApiService {
+  private getAuthHeaders(): Record<string, string> {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -68,6 +73,7 @@ class ApiService {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
         ...options.headers,
       },
       credentials: 'include',

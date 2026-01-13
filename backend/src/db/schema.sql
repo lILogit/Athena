@@ -1,11 +1,12 @@
 -- Enable foreign key constraints
 PRAGMA foreign_keys = ON;
 
--- Users table (mock auth for Phase 1)
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
+  password_hash TEXT,
   avatar_url TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
   last_login INTEGER,
@@ -85,10 +86,4 @@ CREATE INDEX IF NOT EXISTS idx_graph_versions_version ON graph_versions(graph_id
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
 
--- Seed demo user for Phase 1
-INSERT OR IGNORE INTO users (id, email, name, created_at)
-VALUES (1, 'demo@local', 'Demo User', strftime('%s', 'now'));
-
--- Create default project for demo user
-INSERT OR IGNORE INTO projects (id, user_id, name, description, created_at, updated_at)
-VALUES (1, 1, 'My First Project', 'Default project for getting started', strftime('%s', 'now'), strftime('%s', 'now'));
+-- Note: Demo user removed. Users must register to use the system.

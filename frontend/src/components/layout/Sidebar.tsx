@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
+import { useAuth } from '../../store/AuthContext';
 import { Project, Graph } from '@kgs/shared';
 import { api } from '../../services/api';
 
@@ -9,6 +10,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const { graphs, currentGraph, loadGraphs, deleteGraph } = useGraph();
   const { openClarificationDialog } = useUI();
+  const { user, logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number>(1);
   const [graphToDelete, setGraphToDelete] = useState<Graph | null>(null);
@@ -72,7 +74,7 @@ export default function Sidebar() {
 
         {/* New Graph Button */}
         <button
-          onClick={openClarificationDialog}
+          onClick={() => openClarificationDialog(selectedProjectId)}
           className="w-full mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-teal-600 transition-colors font-medium flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,12 +158,21 @@ export default function Sidebar() {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
-            D
+            {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
-          <div>
-            <div className="font-medium text-gray-900">Demo User</div>
-            <div className="text-sm text-gray-600">demo@local</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-gray-900 truncate">{user?.name || 'User'}</div>
+            <div className="text-sm text-gray-600 truncate">{user?.email}</div>
           </div>
+          <button
+            onClick={logout}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            title="Logout"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
       </div>
 

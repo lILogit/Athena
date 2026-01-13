@@ -148,7 +148,7 @@ export class ClarificationController {
    */
   async finalize(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { session_id, title, archetype, archetypeConfig, enrich_graph_id } = req.body as FinalizeClarificationRequest;
+      const { session_id, title, project_id, archetype, archetypeConfig, enrich_graph_id } = req.body as FinalizeClarificationRequest;
 
       if (!session_id) {
         throw new AppError(400, 'INVALID_INPUT', 'session_id is required');
@@ -188,10 +188,12 @@ export class ClarificationController {
       }
 
       // Otherwise, create a new graph
-      const projectId = 1; // TODO: Get from session context
+      if (!project_id) {
+        throw new AppError(400, 'INVALID_INPUT', 'project_id is required to create a new graph');
+      }
 
       const graph = graphService.createGraph(userId, {
-        project_id: projectId,
+        project_id: project_id,
         title: title || `Graph from ${new Date().toLocaleDateString()}`,
         description: `Created from clarification dialog`,
         archetype: archetype || 'general',

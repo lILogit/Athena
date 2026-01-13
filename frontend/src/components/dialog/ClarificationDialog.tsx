@@ -9,7 +9,7 @@ import ArchetypeSelector from './ArchetypeSelector';
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3000');
 
 export default function ClarificationDialog() {
-  const { clarificationDialogOpen, closeClarificationDialog, enrichmentMode, archetypeSelectionPhase, selectedArchetype } = useUI();
+  const { clarificationDialogOpen, closeClarificationDialog, enrichmentMode, archetypeSelectionPhase, selectedArchetype, selectedProjectId } = useUI();
   const { loadGraphs, currentGraph, addNode, addEdge } = useGraph();
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,7 +68,7 @@ export default function ClarificationDialog() {
 
       const result = await api.startClarification({
         initial_input: inputValue,
-        project_id: 1, // TODO: Get from context
+        project_id: selectedProjectId!,
         enrichment_context: existingContext,
       });
 
@@ -119,10 +119,12 @@ export default function ClarificationDialog() {
 
     try {
       // Use fetch with streaming
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/clarify/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -233,6 +235,7 @@ export default function ClarificationDialog() {
         const result = await api.finalizeClarification({
           session_id: sessionId,
           title: `Graph - ${new Date().toLocaleDateString()}`,
+          project_id: selectedProjectId!,
           archetype: selectedArchetype,
         });
 

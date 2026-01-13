@@ -47,7 +47,7 @@ const edgeTypes: EdgeTypes = {
 
 export default function GraphCanvas() {
   const { currentGraph, updateGraph, addNode, addEdge: addGraphEdge, deleteNode, deleteEdge, undo, redo, canUndo, canRedo } = useGraph();
-  const { selectNode, selectNodes, selectEdge, clearSelection, selectedNodeId, selectedEdgeId, contextPanelOpen, toggleContextPanel, openEnrichmentDialog } = useUI();
+  const { selectNode, selectNodes, selectEdge, clearSelection, selectedNodeId, selectedEdgeId, contextPanelOpen, toggleContextPanel, openEnrichmentDialog, openClarificationDialog, selectedProjectId } = useUI();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -610,11 +610,9 @@ export default function GraphCanvas() {
           <h2 className="text-xl font-semibold text-gray-700 mb-2">No Graph Selected</h2>
           <p className="text-gray-600 mb-4">Create a new graph or select an existing one</p>
           <button
-            onClick={() => {
-              const { openClarificationDialog } = useUI();
-              openClarificationDialog();
-            }}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-teal-600 transition-colors font-medium"
+            onClick={() => selectedProjectId && openClarificationDialog(selectedProjectId)}
+            disabled={!selectedProjectId}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-teal-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Create New Graph
           </button>

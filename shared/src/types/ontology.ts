@@ -285,6 +285,7 @@ export interface ClarificationMessageRequest {
 export interface FinalizeClarificationRequest {
   session_id: number;
   title?: string;
+  project_id?: number; // Project to create graph in
   archetype?: GraphArchetype; // Graph archetype type
   archetypeConfig?: ArchetypeConfig; // Archetype-specific configuration
   enrich_graph_id?: number; // If provided, merge into existing graph instead of creating new

@@ -9,6 +9,7 @@ import { logger } from './utils/logger';
 import { initializeDatabase } from './config/database';
 
 // Import routes
+import authRoutes from './routes/auth';
 import graphRoutes from './routes/graphs';
 import projectRoutes from './routes/projects';
 import clarifyRoutes from './routes/clarify';
@@ -16,6 +17,7 @@ import ontologyRoutes from './routes/ontology';
 import userRoutes from './routes/users';
 import suggestionRoutes from './routes/suggestions';
 import chatRoutes from './routes/chat';
+import { requireAuth } from './middleware/auth';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -57,7 +59,7 @@ export function createApp(): Express {
   // Authentication middleware
   app.use(authenticateUser);
 
-  // Health check
+  // Health check (public)
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
@@ -66,14 +68,17 @@ export function createApp(): Express {
     });
   });
 
-  // API routes
-  app.use('/api/graphs', graphRoutes);
-  app.use('/api/projects', projectRoutes);
-  app.use('/api/clarify', clarifyRoutes);
-  app.use('/api/ontology', ontologyRoutes);
-  app.use('/api/users', userRoutes);
-  app.use('/api/suggestions', suggestionRoutes);
-  app.use('/api/chat', chatRoutes);
+  // Public routes (no authentication required)
+  app.use('/api/auth', authRoutes);
+
+  // Protected API routes (authentication required)
+  app.use('/api/graphs', requireAuth, graphRoutes);
+  app.use('/api/projects', requireAuth, projectRoutes);
+  app.use('/api/clarify', requireAuth, clarifyRoutes);
+  app.use('/api/ontology', requireAuth, ontologyRoutes);
+  app.use('/api/users', requireAuth, userRoutes);
+  app.use('/api/suggestions', requireAuth, suggestionRoutes);
+  app.use('/api/chat', requireAuth, chatRoutes);
 
   // SPA fallback - serve index.html for non-API routes (production only)
   if (process.env.NODE_ENV === 'production' && frontendPath) {

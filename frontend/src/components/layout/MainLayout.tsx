@@ -17,6 +17,7 @@ export default function MainLayout() {
     contextPanelOpen,
     toggleSidebar,
     openClarificationDialog,
+    selectedProjectId,
     chatWindowOpen,
     historyViewerOpen,
     toggleChatWindow,
@@ -95,8 +96,9 @@ export default function MainLayout() {
             </button>
 
             <button
-              onClick={openClarificationDialog}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-teal-600 transition-colors font-medium"
+              onClick={() => selectedProjectId && openClarificationDialog(selectedProjectId)}
+              disabled={!selectedProjectId}
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-teal-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               New Graph
             </button>
