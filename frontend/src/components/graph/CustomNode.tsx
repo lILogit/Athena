@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { OntologyNode } from '@kgs/shared';
 import { getNodeColor, getExtendedNodeColor, getDomainColor, getNodeSize } from '../../utils/nodeColors';
+import { useUI } from '../../store/UIContext';
 
 const handleStyle = "!w-2 !h-2 !min-w-0 !min-h-0 !bg-gray-400 hover:!bg-gray-600 hover:!scale-150 !transition-all";
 
@@ -16,6 +17,10 @@ const extendedTypeIcons: Record<string, string> = {
 };
 
 function CustomNode({ data, selected }: NodeProps<OntologyNode>) {
+  // Get focus state
+  const { focusNodeId } = useUI();
+  const isFocused = data.id === focusNodeId;
+
   // Get colors based on extended type, domain, or base type
   const metadata = data.archetypeMetadata;
   const extendedType = data.extendedType;
@@ -43,7 +48,9 @@ function CustomNode({ data, selected }: NodeProps<OntologyNode>) {
     <div
       className={`relative px-4 py-3 rounded-lg shadow-lg transition-all ${
         selected ? 'ring-2 ring-primary ring-offset-2' : ''
-      } ${extendedType === 'cluster' ? 'border-2 border-dashed' : ''}`}
+      } ${extendedType === 'cluster' ? 'border-2 border-dashed' : ''} ${
+        isFocused ? 'ring-4 ring-purple-500 ring-offset-2 shadow-purple-500/50 shadow-xl' : ''
+      }`}
       style={{
         backgroundColor: colors.bg,
         color: colors.text,
@@ -117,8 +124,18 @@ function CustomNode({ data, selected }: NodeProps<OntologyNode>) {
         style={{ top: '70%' }}
       />
 
+      {/* Focus badge */}
+      {isFocused && (
+        <div
+          className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-purple-500 text-white text-xs font-medium"
+          title="Focus node - double-click to clear"
+        >
+          Focus
+        </div>
+      )}
+
       {/* Layer badge for Explanation graphs */}
-      {explanationLayer !== undefined && explanationLayer >= 0 && (
+      {explanationLayer !== undefined && explanationLayer >= 0 && !isFocused && (
         <div
           className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-gray-700 text-white text-xs flex items-center justify-center font-medium"
           title={`Layer ${explanationLayer}`}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -21,6 +21,9 @@ import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
 import ComplexitySlider from './ComplexitySlider';
 import ArchetypeHelpPanel from './ArchetypeHelpPanel';
+import FocusControls from './FocusControls';
+import { computeCentrality } from '../../utils/graphMetrics';
+import { extractViewGraph, ViewGraph } from '../../utils/focusContext';
 import { useGraph } from '../../store/GraphContext';
 import { useUI } from '../../store/UIContext';
 import {
@@ -47,7 +50,30 @@ const edgeTypes: EdgeTypes = {
 
 export default function GraphCanvas() {
   const { currentGraph, updateGraph, addNode, addEdge: addGraphEdge, deleteNode, deleteEdge, undo, redo, canUndo, canRedo } = useGraph();
-  const { selectNode, selectNodes, selectEdge, clearSelection, selectedNodeId, selectedEdgeId, contextPanelOpen, toggleContextPanel, openEnrichmentDialog, openClarificationDialog, selectedProjectId } = useUI();
+  const {
+    selectNode,
+    selectNodes,
+    selectEdge,
+    clearSelection,
+    selectedNodeId,
+    selectedEdgeId,
+    contextPanelOpen,
+    toggleContextPanel,
+    openEnrichmentDialog,
+    openClarificationDialog,
+    selectedProjectId,
+    focusNodeId,
+    outRadius,
+    inRadius,
+    detailLevel,
+    setFocusNode,
+    clearFocus,
+    // History and AI Chat toggles
+    chatWindowOpen,
+    historyViewerOpen,
+    toggleChatWindow,
+    toggleHistoryViewer,
+  } = useUI();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -89,19 +115,62 @@ export default function GraphCanvas() {
   // File input ref for import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Convert ontology data to React Flow format (without auto-layout)
-  // Sync when graph changes, preserving positions and selection
-  useEffect(() => {
-    if (currentGraph) {
-      const isNewGraph = lastLoadedGraphId.current !== currentGraph.id;
-      const nodeCountChanged = nodes.length !== currentGraph.ontology_data.nodes.length;
-      const edgeCountChanged = edges.length !== currentGraph.ontology_data.edges.length;
+  // Compute centrality metrics for all nodes (memoized)
+  const nodeMetrics = useMemo(() => {
+    if (!currentGraph?.ontology_data) return new Map();
+    return computeCentrality(
+      currentGraph.ontology_data.nodes,
+      currentGraph.ontology_data.edges
+    );
+  }, [currentGraph?.ontology_data]);
 
-      // Full reset only for new graph or count changes (add/remove)
-      if (isNewGraph || nodeCountChanged || edgeCountChanged) {
+  // Compute view graph based on focus node and parameters (memoized)
+  const viewGraph: ViewGraph | null = useMemo(() => {
+    if (!currentGraph?.ontology_data) return null;
+    if (!focusNodeId) {
+      // No focus = show entire graph
+      return {
+        nodes: currentGraph.ontology_data.nodes,
+        edges: currentGraph.ontology_data.edges,
+        focusNodeId: '',
+        nodeDistances: new Map(),
+      };
+    }
+    return extractViewGraph(currentGraph.ontology_data, nodeMetrics, {
+      focusNodeId,
+      outRadius,
+      inRadius,
+      detailLevel,
+    });
+  }, [currentGraph?.ontology_data, nodeMetrics, focusNodeId, outRadius, inRadius, detailLevel]);
+
+  // Clear focus if focused node is deleted
+  useEffect(() => {
+    if (focusNodeId && currentGraph?.ontology_data) {
+      const nodeExists = currentGraph.ontology_data.nodes.some(n => n.id === focusNodeId);
+      if (!nodeExists) {
+        clearFocus();
+      }
+    }
+  }, [currentGraph?.ontology_data.nodes, focusNodeId, clearFocus]);
+
+  // Track previous focus node ID to detect focus changes
+  const prevFocusNodeIdRef = useRef<string | null>(null);
+
+  // Convert ontology data to React Flow format (without auto-layout)
+  // Sync when graph or viewGraph changes, preserving positions and selection
+  useEffect(() => {
+    if (currentGraph && viewGraph) {
+      const isNewGraph = lastLoadedGraphId.current !== currentGraph.id;
+      // Detect focus change (including clearing focus)
+      const focusChanged = prevFocusNodeIdRef.current !== focusNodeId;
+      prevFocusNodeIdRef.current = focusNodeId;
+
+      // Force full sync when focus changes
+      if (isNewGraph || focusChanged) {
         // ontologyNodesToFlow uses stored positions from node.position if available
-        const flowNodes = ontologyNodesToFlow(currentGraph.ontology_data.nodes);
-        const flowEdges = ontologyEdgesToFlow(currentGraph.ontology_data.edges);
+        const flowNodes = ontologyNodesToFlow(viewGraph.nodes);
+        const flowEdges = ontologyEdgesToFlow(viewGraph.edges);
 
         // For existing session nodes (same graph, node added/removed), preserve in-memory positions
         const existingNodes = new Map(nodes.map(n => [n.id, n]));
@@ -124,32 +193,59 @@ export default function GraphCanvas() {
         setEdges(flowEdges);
         lastLoadedGraphId.current = currentGraph.id;
       } else {
-        // For property updates only, update data in place to preserve selection
-        setNodes((nds) =>
-          nds.map((node) => {
-            const ontologyNode = currentGraph.ontology_data.nodes.find((n) => n.id === node.id);
-            if (ontologyNode) {
-              return { ...node, data: ontologyNode };
+        // Check for count/id changes (node add/remove without focus change)
+        const nodeCountChanged = nodes.length !== viewGraph.nodes.length;
+        const edgeCountChanged = edges.length !== viewGraph.edges.length;
+        const nodeIdsChanged = nodes.map(n => n.id).sort().join(',') !==
+          viewGraph.nodes.map(n => n.id).sort().join(',');
+
+        if (nodeCountChanged || edgeCountChanged || nodeIdsChanged) {
+          const flowNodes = ontologyNodesToFlow(viewGraph.nodes);
+          const flowEdges = ontologyEdgesToFlow(viewGraph.edges);
+          const existingNodes = new Map(nodes.map(n => [n.id, n]));
+
+          const nodesWithPositions = flowNodes.map((node) => {
+            const existingNode = existingNodes.get(node.id);
+            if (existingNode) {
+              return {
+                ...node,
+                position: existingNode.position,
+                selected: existingNode.selected,
+              };
             }
             return node;
-          })
-        );
-        setEdges((eds) =>
-          eds.map((edge) => {
-            const ontologyEdge = currentGraph.ontology_data.edges.find((e) => e.id === edge.id);
-            if (ontologyEdge) {
-              return { ...edge, data: ontologyEdge };
-            }
-            return edge;
-          })
-        );
+          });
+
+          setNodes(nodesWithPositions);
+          setEdges(flowEdges);
+        } else {
+          // For property updates only, update data in place to preserve selection
+          setNodes((nds) =>
+            nds.map((node) => {
+              const ontologyNode = viewGraph.nodes.find((n) => n.id === node.id);
+              if (ontologyNode) {
+                return { ...node, data: ontologyNode };
+              }
+              return node;
+            })
+          );
+          setEdges((eds) =>
+            eds.map((edge) => {
+              const ontologyEdge = viewGraph.edges.find((e) => e.id === edge.id);
+              if (ontologyEdge) {
+                return { ...edge, data: ontologyEdge };
+              }
+              return edge;
+            })
+          );
+        }
       }
     } else {
       setNodes([]);
       setEdges([]);
       lastLoadedGraphId.current = null;
     }
-  }, [currentGraph]);
+  }, [currentGraph, viewGraph, focusNodeId]);
 
   // Layout functions for different algorithms
   const applyLayout = useCallback((layoutType: string) => {
@@ -344,6 +440,19 @@ export default function GraphCanvas() {
       }
     },
     [selectNode, contextPanelOpen, toggleContextPanel]
+  );
+
+  // Handle double-click to set focus
+  const onNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      // Toggle focus: if already focused, clear; otherwise set focus
+      if (node.id === focusNodeId) {
+        clearFocus();
+      } else {
+        setFocusNode(node.id);
+      }
+    },
+    [focusNodeId, setFocusNode, clearFocus]
   );
 
   // Handle edge selection
@@ -571,8 +680,9 @@ export default function GraphCanvas() {
   }, [handleDelete, undo, redo]);
 
   // Save graph when nodes/edges change (includes positions)
+  // IMPORTANT: Skip save when in focus mode to avoid overwriting full graph with filtered subset
   useEffect(() => {
-    if (currentGraph && nodes.length > 0) {
+    if (currentGraph && nodes.length > 0 && !focusNodeId) {
       // Debounce save to avoid too many updates
       const timeoutId = setTimeout(() => {
         const updatedOntologyData = {
@@ -588,7 +698,7 @@ export default function GraphCanvas() {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, focusNodeId]);
 
   if (!currentGraph) {
     return (
@@ -623,84 +733,9 @@ export default function GraphCanvas() {
 
   return (
     <div className="w-full h-full relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        onEdgeClick={onEdgeClick}
-        onEdgeDoubleClick={onEdgeDoubleClick}
-        onPaneClick={onPaneClick}
-        onConnect={onConnect}
-        onSelectionChange={onSelectionChange}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        connectionMode={ConnectionMode.Loose}
-        fitView
-        attributionPosition="bottom-left"
-        connectOnClick={false}
-        selectionOnDrag
-        multiSelectionKeyCode="Shift"
-      >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        <Controls />
-        <MiniMap
-          nodeColor={(node) => {
-            const data = node.data;
-            if (!data) return '#6B7280';
-            if (data.type === 'entity') return '#3B82F6';
-            if (data.type === 'event') return '#F97316';
-            if (data.type === 'process') return '#10B981';
-            if (data.type === 'attribute') return '#8B5CF6';
-            return '#6B7280';
-          }}
-          className="!bg-white !border !border-gray-200"
-        />
-
-        {/* Complexity Slider for Explanation graphs */}
-        {currentGraph?.archetype === 'explanation' && (
-          <Panel position="bottom-left" className="ml-12 mb-4">
-            <ComplexitySlider />
-          </Panel>
-        )}
-
-        {/* Archetype Help Panel */}
-        {currentGraph?.archetype && (
-          <Panel position="bottom-right" className="mr-2 mb-4">
-            <ArchetypeHelpPanel archetype={currentGraph.archetype} />
-          </Panel>
-        )}
-
-        {/* Archetype badge */}
-        {currentGraph?.archetype && currentGraph.archetype !== 'general' && (
-          <Panel position="top-left" className="ml-12">
-            <div className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${
-              currentGraph.archetype === 'knowledge-mining' ? 'bg-purple-100 text-purple-800' :
-              currentGraph.archetype === 'explanation' ? 'bg-amber-100 text-amber-800' :
-              currentGraph.archetype === 'goal-achievement' ? 'bg-green-100 text-green-800' :
-              currentGraph.archetype === 'decision' ? 'bg-blue-100 text-blue-800' :
-              currentGraph.archetype === 'prediction' ? 'bg-indigo-100 text-indigo-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              <span>
-                {currentGraph.archetype === 'knowledge-mining' ? '🔍' :
-                 currentGraph.archetype === 'explanation' ? '💡' :
-                 currentGraph.archetype === 'goal-achievement' ? '🎯' :
-                 currentGraph.archetype === 'decision' ? '⚖️' :
-                 currentGraph.archetype === 'prediction' ? '🔮' : '📊'}
-              </span>
-              {currentGraph.archetype === 'knowledge-mining' ? 'Knowledge Mining' :
-               currentGraph.archetype === 'explanation' ? 'Explanation' :
-               currentGraph.archetype === 'goal-achievement' ? 'Goal Achievement' :
-               currentGraph.archetype === 'decision' ? 'Decision' :
-               currentGraph.archetype === 'prediction' ? 'Prediction' : currentGraph.archetype}
-            </div>
-          </Panel>
-        )}
-
-        {/* Toolbar Panel */}
-        <Panel position="top-center" className="bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex gap-2">
+      {/* Toolbar - positioned absolutely at top to appear in header area */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-20">
+        <div className="bg-white rounded-b-lg shadow-lg border border-t-0 border-gray-200 p-2 flex gap-2 items-center">
           {/* Undo/Redo */}
           <div className="flex gap-1 border-r border-gray-200 pr-2">
             <button
@@ -724,6 +759,23 @@ export default function GraphCanvas() {
               </svg>
             </button>
           </div>
+
+          {/* Clear Focus - show when focused */}
+          {focusNodeId && (
+            <>
+              <button
+                onClick={clearFocus}
+                className="px-3 py-1.5 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors text-sm font-medium flex items-center gap-1"
+                title="Clear focus and show full graph"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear Focus
+              </button>
+              <div className="w-px h-6 bg-gray-200" />
+            </>
+          )}
 
           <button
             onClick={() => setShowAddNodeModal(true)}
@@ -962,7 +1014,124 @@ export default function GraphCanvas() {
             onChange={handleImportGraph}
             className="hidden"
           />
+
+          {/* Separator */}
+          <div className="w-px h-6 bg-gray-200" />
+
+          {/* History Viewer Toggle */}
+          <button
+            onClick={toggleHistoryViewer}
+            className={`p-1.5 rounded transition-colors ${
+              historyViewerOpen
+                ? 'bg-purple-100 text-purple-600'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Graph History"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+
+          {/* AI Chat Toggle */}
+          <button
+            onClick={toggleChatWindow}
+            className={`p-1.5 rounded transition-colors ${
+              chatWindowOpen
+                ? 'bg-purple-100 text-purple-600'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title="AI Assistant"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onEdgeClick={onEdgeClick}
+        onEdgeDoubleClick={onEdgeDoubleClick}
+        onPaneClick={onPaneClick}
+        onConnect={onConnect}
+        onSelectionChange={onSelectionChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        connectionMode={ConnectionMode.Loose}
+        fitView
+        attributionPosition="bottom-left"
+        connectOnClick={false}
+        selectionOnDrag
+        multiSelectionKeyCode="Shift"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <Controls />
+        <MiniMap
+          nodeColor={(node) => {
+            const data = node.data;
+            if (!data) return '#6B7280';
+            if (data.type === 'entity') return '#3B82F6';
+            if (data.type === 'event') return '#F97316';
+            if (data.type === 'process') return '#10B981';
+            if (data.type === 'attribute') return '#8B5CF6';
+            return '#6B7280';
+          }}
+          className="!bg-white !border !border-gray-200"
+        />
+
+        {/* Complexity Slider for Explanation graphs */}
+        {currentGraph?.archetype === 'explanation' && (
+          <Panel position="bottom-left" className="ml-12 mb-4">
+            <ComplexitySlider />
+          </Panel>
+        )}
+
+        {/* Focus Controls Panel */}
+        <Panel position="top-right" className="mr-2 mt-2">
+          <FocusControls />
         </Panel>
+
+        {/* Archetype Help Panel */}
+        {currentGraph?.archetype && (
+          <Panel position="bottom-right" className="mr-2 mb-4">
+            <ArchetypeHelpPanel archetype={currentGraph.archetype} />
+          </Panel>
+        )}
+
+        {/* Archetype badge */}
+        {currentGraph?.archetype && currentGraph.archetype !== 'general' && (
+          <Panel position="top-left" className="ml-12">
+            <div className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              currentGraph.archetype === 'knowledge-mining' ? 'bg-purple-100 text-purple-800' :
+              currentGraph.archetype === 'explanation' ? 'bg-amber-100 text-amber-800' :
+              currentGraph.archetype === 'goal-achievement' ? 'bg-green-100 text-green-800' :
+              currentGraph.archetype === 'decision' ? 'bg-blue-100 text-blue-800' :
+              currentGraph.archetype === 'prediction' ? 'bg-indigo-100 text-indigo-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              <span>
+                {currentGraph.archetype === 'knowledge-mining' ? '🔍' :
+                 currentGraph.archetype === 'explanation' ? '💡' :
+                 currentGraph.archetype === 'goal-achievement' ? '🎯' :
+                 currentGraph.archetype === 'decision' ? '⚖️' :
+                 currentGraph.archetype === 'prediction' ? '🔮' : '📊'}
+              </span>
+              {currentGraph.archetype === 'knowledge-mining' ? 'Knowledge Mining' :
+               currentGraph.archetype === 'explanation' ? 'Explanation' :
+               currentGraph.archetype === 'goal-achievement' ? 'Goal Achievement' :
+               currentGraph.archetype === 'decision' ? 'Decision' :
+               currentGraph.archetype === 'prediction' ? 'Prediction' : currentGraph.archetype}
+            </div>
+          </Panel>
+        )}
+
       </ReactFlow>
 
       {/* Add Node Modal */}

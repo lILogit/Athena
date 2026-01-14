@@ -25,6 +25,12 @@ interface UIState {
   chatWindowOpen: boolean;
   historyViewerOpen: boolean;
 
+  // Focus+Context state
+  focusNodeId: string | null;          // Currently focused node
+  outRadius: number;                   // Hops outward (1-5, default 2)
+  inRadius: number;                    // Hops inward (1-5, default 2)
+  detailLevel: number;                 // 0-1 slider (default 0.5)
+
   // Actions
   toggleSidebar: () => void;
   toggleContextPanel: () => void;
@@ -45,6 +51,13 @@ interface UIState {
   closeChatWindow: () => void;
   openHistoryViewer: () => void;
   closeHistoryViewer: () => void;
+
+  // Focus+Context actions
+  setFocusNode: (nodeId: string | null) => void;
+  setOutRadius: (radius: number) => void;
+  setInRadius: (radius: number) => void;
+  setDetailLevel: (level: number) => void;
+  clearFocus: () => void;
 }
 
 const useUIStore = create<UIState>((set) => ({
@@ -61,6 +74,12 @@ const useUIStore = create<UIState>((set) => ({
   archetypeSelectionPhase: true,
   chatWindowOpen: false,
   historyViewerOpen: false,
+
+  // Focus+Context defaults
+  focusNodeId: null,
+  outRadius: 2,
+  inRadius: 2,
+  detailLevel: 0.5,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   toggleContextPanel: () => set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
@@ -100,6 +119,13 @@ const useUIStore = create<UIState>((set) => ({
   closeChatWindow: () => set({ chatWindowOpen: false }),
   openHistoryViewer: () => set({ historyViewerOpen: true }),
   closeHistoryViewer: () => set({ historyViewerOpen: false }),
+
+  // Focus+Context actions
+  setFocusNode: (nodeId) => set({ focusNodeId: nodeId }),
+  setOutRadius: (radius) => set({ outRadius: Math.max(1, Math.min(5, radius)) }),
+  setInRadius: (radius) => set({ inRadius: Math.max(1, Math.min(5, radius)) }),
+  setDetailLevel: (level) => set({ detailLevel: Math.max(0, Math.min(1, level)) }),
+  clearFocus: () => set({ focusNodeId: null }),
 }));
 
 // Export the hook directly instead of using context
