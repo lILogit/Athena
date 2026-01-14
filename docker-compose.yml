@@ -3,26 +3,31 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: athena-app
-    restart: unless-stopped
-    ports:
-      - "${PORT:-3000}:3000"
+    container_name: kgs-app
     environment:
       - NODE_ENV=production
       - PORT=3000
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-5-20250929}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - SQLITE_DB_PATH=/app/data/kgs.db
-    volumes:
-      - athena-data:/app/data
+      - FRONTEND_URL=http://72.62.52.120
+      - DATABASE_PATH=/app/data/kgs.db
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+    ports:
+      - "80:3000"
+    volumes:
+      - kgs-data:/app/data
+    networks:
+      - kgs-network
+
+networks:
+  kgs-network:
+    driver: bridge
 
 volumes:
-  athena-data:
+  kgs-data:
     driver: local
